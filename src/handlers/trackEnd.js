@@ -88,10 +88,9 @@ function registerTrackEnd() {
                             guildId,
                             voiceChannelId: vc?.id || player.voiceChannelId,
                             textChannelId: textChannel?.id || player.textChannelId,
-                            selfDeaf: true,
                             volume: 100
                         });
-                        await newPlayer.connect();
+                        await newPlayer.connect({ selfDeaf: true });
 
                         if (savedQueue.length > 0) {
                             newPlayer.queue.add(savedQueue);
