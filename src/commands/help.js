@@ -15,7 +15,7 @@ async function execute(message) {
             { name: 'Stats', value: '`top` - Most played in this server\n`global` - Most played across all servers' },
             { name: 'Effects', value: '`nightcore`, `vaporwave`, `tremolo`, `vibrato`, `rotation`, `lowpass`, `echo`, `karaoke`' },
             { name: 'Search Platforms', value: `Default Platform: ${getEmoji('spotify', guild, channel)} Spotify\nUse flags with \`play\` command:\n${getEmoji('soundcloud', guild, channel)} \`--sc\` SoundCloud • ${getEmoji('deezer', guild, channel)} \`--dz\` Deezer\n${getEmoji('apple_music', guild, channel)} \`--am\` Apple Music • ${getEmoji('tidal', guild, channel)} \`--td\` Tidal\n\`--sr\` Show search results` },
-            { name: 'Other', value: '`restart` / `fix` - Restart player (connection issues)\n`help` - Show this message\n`sr` - Restart the bot' }
+            { name: 'Other', value: '`restart` / `fix` - Restart player (connection issues)\n`help` - Show this message\n`credits` - Project credits and repository\n`sr` - Restart the bot' }
         )
         .setColor('#6A5ACD')
         .setFooter(getBotFooter());
