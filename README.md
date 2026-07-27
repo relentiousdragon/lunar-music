@@ -5,10 +5,8 @@
 [![moonlink.js](https://img.shields.io/badge/moonlink.js-v5.2.0-blueviolet)](https://github.com/Ecliptia/moonlink.js)
 [![node](https://img.shields.io/badge/node-v20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/relentiousdragon/lunar-music?style=social)](https://github.com/relentiousdragon/lunar-music/stargazers)
-[![Repository views](https://komarev.com/ghpvc/?username=relentiousdragon&repo=lunar-music&style=flat&label=views)](https://github.com/relentiousdragon/lunar-music)
+[![Views](https://komarev.com/ghpvc/?username=relentiousdragon&repo=lunar-music&style=flat&label=views)](https://github.com/relentiousdragon/lunar-music)
 ![Commits](https://badgen.net/github/commits/relentiousdragon/lunar-music?cache=300)
-![Last update](https://badgen.net/github/last-commit/relentiousdragon/lunar-music?cache=300)
 
 a discord music bot that plays from spotify, soundcloud, deezer, apple music, tidal, and more. built with [discord.js](https://discord.js.org) and [moonlink.js](https://github.com/Ecliptia/moonlink.js).
 
