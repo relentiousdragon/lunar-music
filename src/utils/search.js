@@ -1,96 +1,82 @@
 const manager = require('../manager');
 const { searchFailures } = require('../state');
+const logger = require('./logger');
+const { supports, markUnavailable, getUnavailableReason } = require('./capabilities');
+
+const SOURCE_ORDER = ['spotify', 'tdsearch', 'soundcloud', 'amsearch', 'deezer'];
+const DISALLOWED_QUERY = /(youtube\.com|youtu\.be|ytsearch:|youtube:)/i;
 //
-async function searchWithRetry(player, query, requester, source = 'spotify', attempt = 1) {
-    const maxAttempts = 2;
-    try {
-        if (/(youtube\.com|youtu\.be|ytsearch:)/i.test(query)) {
-            console.log(`[search] blocked youtube query from ${requester.id || requester}`);
-            return { loadType: 'empty', tracks: [], isEmpty: true };
-        }
+function requesterId(requester) {
+    return requester?.id || (typeof requester === 'string' ? requester : 'unknown');
+}
 
-        console.log(`[search] attempt ${attempt} | query: "${query}" | source: ${source || 'auto'}`);
+function hasTracks(result) {
+    return Boolean(result && result.loadType !== 'error' && result.loadType !== 'empty' && result.tracks?.length);
+}
 
-        const searchOptions = {
-            query,
-            requester: requester.id || (typeof requester === 'string' ? requester : 'unknown')
-        };
-        if (source) searchOptions.source = source;
+function filterTracks(result) {
+    if (!result?.tracks) return result;
+    result.tracks = result.tracks.filter(track => !DISALLOWED_QUERY.test(track.uri || track.url || ''));
+    if (result.tracks.length === 0) result.loadType = 'empty';
+    return result;
+}
 
-        if (!source && !/^https?:\/\//i.test(query) && !/^(sc|dz|am|td)search:/i.test(query)) {
-            searchOptions.source = 'spotify';
-        }
+async function searchOnce(query, requester, source) {
+    const options = { query, requester: requesterId(requester) };
+    if (source) options.source = source;
+    return Promise.race([
+        manager.search(options),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('search timeout after 20s')), 20000))
+    ]);
+}
 
-        const result = await Promise.race([
-            manager.search(searchOptions),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('search timeout after 20s')), 20000))
-        ]);
-
-        if (!result || result.loadType === 'error' || result.loadType === 'empty' || !result.tracks || result.tracks.length === 0) {
-            console.log(`[search] attempt ${attempt} failed | query: "${query}"`);
-
-            const now = Date.now();
-            searchFailures.push(now);
-
-            while (searchFailures.length > 0 && now - searchFailures[0] > 120000) {
-                searchFailures.shift();
-            }
-
-            if (searchFailures.length >= 2) {
-                console.log(`[search] ${searchFailures.length} failures in 2 minutes, reconnecting nodes`);
-                manager.nodes.forEach(node => {
-                    console.log(`[manager] reconnecting node: ${node.identifier}`);
-                    node.reconnect();
-                });
-                searchFailures.length = 0;
-            }
-
-            if (query.startsWith('http') || attempt >= 3) {
-                return result || { loadType: 'empty', tracks: [] };
-            }
-
-            await new Promise(r => setTimeout(r, 1000));
-
-            if (attempt === 1 && !source && !/^(sc|dz|am|td)search:/i.test(query)) {
-                return await searchWithRetry(player, query, requester, 'soundcloud', attempt + 1);
-            }
-
-            if (attempt === 2) {
-                console.log(`[search] final fallback for: ${query}`);
-                const queryWithoutPrefix = query.replace(/^(sc|dz|am|td)search:/i, '');
-                const finalResult = await manager.search({
-                    query: queryWithoutPrefix,
-                    requester: requester.id || (typeof requester === 'string' ? requester : 'unknown')
-                });
-
-                if (finalResult.tracks) {
-                    finalResult.tracks = finalResult.tracks.filter(t => !/(youtube\.com|youtu\.be)/i.test(t.uri || ''));
-                    if (finalResult.tracks.length === 0) finalResult.loadType = 'empty';
-                }
-                return finalResult;
-            }
-        }
-
-        if (result.tracks && result.tracks.length > 0) {
-            const count = result.tracks.length;
-            result.tracks = result.tracks.filter(t => !/(youtube\.com|youtu\.be)/i.test(t.uri || ''));
-            if (result.tracks.length === 0) {
-                console.log(`[search] all ${count} results were youtube, filtered`);
-                result.loadType = 'empty';
-            }
-        }
-
-        return result;
-    } catch (err) {
-        console.log(`[search] attempt ${attempt} exception: ${err.message}`);
-
-        if (attempt < maxAttempts && !query.startsWith('http') && !/^(sc|dz|am|td)search:/i.test(query)) {
-            return await searchWithRetry(player, `scsearch:${query}`, requester, null, attempt + 1);
-        }
-
-        return { loadType: 'empty', tracks: [] };
+async function searchWithRetry(player, query, requester, source = null) {
+    if (DISALLOWED_QUERY.test(query)) {
+        console.log(`[search] blocked disallowed video platform query from ${requesterId(requester)}`);
+        return { loadType: 'empty', tracks: [], isEmpty: true, error: 'Video platform playback is disabled' };
     }
+
+    const sources = source ? [source] : (/^https?:\/\//i.test(query) ? [null] : SOURCE_ORDER);
+    let lastResult = { loadType: 'empty', tracks: [] };
+
+    for (const currentSource of sources) {
+        if (currentSource && !supports(currentSource)) {
+            const reason = getUnavailableReason(currentSource) || 'unsupported by the connected node';
+            logger.warn('search_source_skipped', { source: currentSource, reason, query });
+            lastResult = { loadType: 'error', tracks: [], error: new Error(`${currentSource} search unavailable on this node`) };
+            continue;
+        }
+        try {
+            logger.info('search_started', { source: currentSource || 'direct', query });
+            const result = filterTracks(await searchOnce(query, requester, currentSource));
+            logger.info('search_response', {
+                source: currentSource || 'direct',
+                query,
+                loadType: result?.loadType,
+                trackCount: result?.tracks?.length || 0
+            });
+            if (hasTracks(result)) return result;
+            lastResult = result || lastResult;
+        } catch (error) {
+            const message = error.message || String(error);
+            if (/NodeLink-only|403|404|unknown source|unsupported/i.test(message) && currentSource) {
+                markUnavailable(currentSource, message);
+            }
+            logger.warn('search_failed', { source: currentSource || 'direct', query, error: message });
+            lastResult = { loadType: 'error', tracks: [], error };
+        }
+    }
+
+    searchFailures.push(Date.now());
+    while (searchFailures.length && Date.now() - searchFailures[0] > 120000) searchFailures.shift();
+    if (searchFailures.length >= 2) {
+        manager.nodes.nodes.forEach(node => {
+            Promise.resolve(node.reconnect()).catch(() => { });
+        });
+        searchFailures.length = 0;
+    }
+    return lastResult;
 }
 //
-module.exports = { searchWithRetry };
+module.exports = { searchWithRetry, SOURCE_ORDER, filterTracks };
 // contributors: @relentiousdragon
