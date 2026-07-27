@@ -1,6 +1,8 @@
 const { fork } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
+const { syncApplicationEmojis } = require('./src/utils/emojiSync');
 
 const LOGS_DIR = path.join(__dirname, 'logs');
 const ERROR_LOG = path.join(LOGS_DIR, 'error.log');
@@ -100,5 +102,7 @@ function shutdown(signal) {
 //
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-startBot();
+syncApplicationEmojis()
+    .catch(error => console.error(`[emoji-sync] unexpected startup error: ${error.message}`))
+    .finally(() => startBot());
 // contributors: @relentiousdragon
