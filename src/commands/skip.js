@@ -2,9 +2,10 @@ const { EmbedBuilder } = require('discord.js');
 const { getVoiceConnection } = require('@discordjs/voice');
 const manager = require('../manager');
 const { createEmbed } = require('../utils/embeds');
-const { getFormattedDuration } = require('../utils/format');
+const { getFormattedDuration, getTrackUrl } = require('../utils/format');
 const { getEmoji } = require('../utils/emojis');
 const { getBotFooter } = require('../utils/branding');
+const { canControlPlayer } = require('../utils/permissions');
 //
 async function executeSkip(message, args) {
     const guild = message.guild;
@@ -19,7 +20,7 @@ async function executeSkip(message, args) {
         });
     }
 
-    if (!message.member.voice.channel || message.member.voice.channel.id !== skipPlayer.voiceChannelId) {
+    if (!canControlPlayer(message, skipPlayer)) {
         return message.channel.send({
             embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Permission Denied`, 'You must be in the voice channel to use this command!', '#FF0000')]
         });
@@ -63,7 +64,7 @@ async function executePrevious(message, args) {
     }
 
     const last10 = history.slice(-10).reverse();
-    const description = last10.map((t, i) => `**${i + 1}.** ${t.author || 'Unknown'} - [${t.title}](${t.uri}) \`(${getFormattedDuration(t)})\``).join('\n');
+    const description = last10.map((t, i) => `**${i + 1}.** ${t.author || 'Unknown'} - [${t.title}](${getTrackUrl(t)}) \`(${getFormattedDuration(t)})\``).join('\n');
 
     const embed = new EmbedBuilder()
         .setTitle(`${getEmoji('star', guild, channel)} Previously Played`)
@@ -84,7 +85,7 @@ async function executeBack(message, args) {
         });
     }
 
-    if (!message.member.voice.channel || message.member.voice.channel.id !== backPlayer.voiceChannelId) {
+    if (!canControlPlayer(message, backPlayer)) {
         return message.channel.send({
             embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Permission Denied`, 'You must be in the voice channel!', '#FF0000')]
         });
