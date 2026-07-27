@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { getEmoji } = require('./emojis');
 const { getBotFooter } = require('./branding');
+const logger = require('./logger');
 //
 function createEmbed(title, description, color = '#2F3136') {
     return new EmbedBuilder()
@@ -12,7 +13,12 @@ function createEmbed(title, description, color = '#2F3136') {
 }
 
 function handleError(message, error, customMessage = null) {
-    console.log(`[error] ${error.message} | query: ${message?.content} | user: ${message?.author?.tag}`);
+    logger.error('command_error', {
+        error: error.message,
+        query: message?.content,
+        user: message?.author?.tag,
+        guild: message?.guild?.id
+    });
 
     const icon = getEmoji('xmark', message?.guild, message?.channel);
     const embed = new EmbedBuilder()
