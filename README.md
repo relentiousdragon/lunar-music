@@ -2,8 +2,8 @@
 ### In early testing stage, feel free to create an Issue or Pull Request to contribute.
 ![now playing](assets/banner.png)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-5865F2?logo=discord&logoColor=white)](https://discord.js.org)
-[![moonlink.js](https://img.shields.io/badge/moonlink.js-v4-blueviolet)](https://github.com/Ecliptia/moonlink.js)
-[![node](https://img.shields.io/badge/node-≥18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![moonlink.js](https://img.shields.io/badge/moonlink.js-v5.2.0-blueviolet)](https://github.com/Ecliptia/moonlink.js)
+[![node](https://img.shields.io/badge/node-v20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
 a discord music bot that plays from spotify, soundcloud, deezer, apple music, tidal, and more. built with [discord.js](https://discord.js.org) and [moonlink.js](https://github.com/Ecliptia/moonlink.js).
