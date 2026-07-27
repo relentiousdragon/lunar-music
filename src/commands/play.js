@@ -3,7 +3,8 @@ const manager = require('../manager');
 const client = require('../client');
 const { playerStates, selectionCollectors, colorCache } = require('../state');
 const { createEmbed } = require('../utils/embeds');
-const { getFormattedDuration, getRequesterId } = require('../utils/format');
+const { getFormattedDuration, getTrackUrl, getRequesterId } = require('../utils/format');
+const logger = require('../utils/logger');
 const { getDominantColor, getPlatformColor } = require('../utils/color');
 const { getPlatformEmoji } = require('../utils/metadata');
 const { searchWithRetry } = require('../utils/search');
@@ -31,7 +32,7 @@ async function execute(message, args) {
         const query = args.filter(arg => !arg.startsWith('--')).join(' ');
         if (!query) {
             return message.channel.send({
-                embeds: [createEmbed(`${getEmoji('star', guild, channel)} Missing Query`, 'Please provide a song name or URL!', '#FFA500')]
+                embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Missing Query`, 'Please provide a song name or URL!', '#FFA500')]
             });
         }
 
@@ -55,7 +56,7 @@ async function execute(message, args) {
 
         try {
             if (!player) {
-                if (manager.nodes.length === 0) {
+                if (manager.nodes.nodes.size === 0) {
                     throw new Error('No nodes configured. Please wait a moment or check configuration.');
                 }
 
@@ -63,40 +64,40 @@ async function execute(message, args) {
                     guildId: message.guild.id,
                     voiceChannelId: message.member.voice.channel.id,
                     textChannelId: message.channel.id,
-                    selfDeaf: true,
                     volume: 100,
                     autoPlay: false
                 });
-                await player.connect();
+                await player.connect({ selfDeaf: true });
             } else {
                 player.textChannelId = message.channel.id;
             }
 
-            let source = 'spotify';
+            let source = 'spsearch';
             if (!/^https?:\/\//i.test(query)) {
-                if (useSoundcloud) source = 'soundcloud';
-                else if (useDeezer) source = 'deezer';
-                else if (useAppleMusic) source = 'applemusic';
-                else if (useTidal) source = 'tidal';
+                if (useSoundcloud) source = 'scsearch';
+                else if (useDeezer) source = 'dzsearch';
+                else if (useAppleMusic) source = 'amsearch';
+                else if (useTidal) source = 'tdsearch';
             }
 
             const result = await searchWithRetry(player, query, message.author, source);
 
-            if (result.isEmpty || result.isError || !result.tracks?.length) {
+            if (result.loadType === 'empty' || result.loadType === 'error' || !result.tracks?.length) {
+                const reason = result.error?.message || result.error;
                 await loadingMsg.edit({
                     content: '',
-                    embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} No Results`, 'No tracks found for your query!', '#FF0000')]
+                    embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Search Unavailable`, reason || 'No tracks found for your query.', '#FF0000')]
                 });
                 return;
             }
 
             let tracksToPlay = [];
 
-            if (showResults && result.isSearch && result.tracks.length > 1) {
+            if (showResults && result.loadType === 'search' && result.tracks.length > 1) {
                 const top5 = result.tracks.slice(0, 5);
                 const selectEmbed = new EmbedBuilder()
-                    .setTitle(`${getEmoji('star', guild, channel)} Select a Track`)
-                    .setDescription(top5.map((t, i) => `**${i + 1}.** ${t.author || 'Unknown'} - [${t.title}](${t.uri}) \`(${getFormattedDuration(t)})\``).join('\n'))
+                    .setTitle(`${getEmoji('headphones', guild, channel)} Select a Track`)
+                    .setDescription(top5.map((t, i) => `**${i + 1}.** ${t.author || 'Unknown'} - [${t.title}](${getTrackUrl(t)}) \`(${getFormattedDuration(t)})\``).join('\n'))
                     .setColor('#6A5ACD')
                     .setFooter({ text: 'Selection expires in 60s | Type 1-5 to select' });
 
@@ -133,12 +134,12 @@ async function execute(message, args) {
 
                 tracksToPlay = [selected];
             } else {
-                tracksToPlay = result.isPlaylist ? result.tracks : [result.tracks[0]];
+                tracksToPlay = result.loadType === 'playlist' ? result.tracks : [result.tracks[0]];
             }
 
             const wasEmpty = !player.current && player.queue.tracks.length === 0;
 
-            if (result.isPlaylist) {
+            if (result.loadType === 'playlist') {
                 result.tracks.forEach(t => {
                     if (!t.userData) t.userData = {};
                     t.userData.requester = message.author;
@@ -149,7 +150,7 @@ async function execute(message, args) {
                 if (!wasEmpty) {
                     const embed = new EmbedBuilder()
                         .setTitle(`${getEmoji('checkmark', guild, channel)} Added Playlist to Queue`)
-                        .setDescription(`Added **${result.tracks.length}** tracks from **${result.playlist?.name || 'Playlist'}**`)
+                        .setDescription(`Added **${result.tracks.length}** tracks from **${result.playlistInfo?.name || 'Playlist'}**`)
                         .setColor('#00FF00')
                         .setFooter(getBotFooter())
                         .setTimestamp();
@@ -165,7 +166,7 @@ async function execute(message, args) {
 
                 if (!wasEmpty) {
                     const platformEmoji = getPlatformEmoji(track, guild, channel);
-                    const art = track.artworkUrl || track.thumbnail;
+                    const art = track.artworkUrl;
 
                     const sendAddedEmbed = async () => {
                         let embedColor = '#00FF00';
@@ -185,7 +186,7 @@ async function execute(message, args) {
 
                         const embed = new EmbedBuilder()
                             .setTitle(`${getEmoji('checkmark', guild, channel)} Added to Queue`)
-                            .setDescription(`${platformEmoji} [${track.title}](${track.uri})`)
+                            .setDescription(`${platformEmoji} [${track.title}](${getTrackUrl(track)})`)
                             .setColor(embedColor)
                             .addFields(
                                 { name: 'Duration', value: `\`${getFormattedDuration(track)}\``, inline: true },
@@ -210,6 +211,13 @@ async function execute(message, args) {
                     message.channel.send({ embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Playback Error`, `Could not start playback: ${e.message}`, '#FF0000')] });
                 }
             }
+
+            logger.info('player_state', {
+                guild: message.guild.id,
+                state: player.playing ? 'playing' : player.paused ? 'paused' : 'idle',
+                source: source || 'fallback-order',
+                track: player.current?.title
+            });
 
         } catch (error) {
             console.log(`[play] error: ${error.message}`);
