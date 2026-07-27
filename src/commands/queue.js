@@ -3,7 +3,7 @@ const manager = require('../manager');
 const client = require('../client');
 const { playerStates } = require('../state');
 const { createEmbed } = require('../utils/embeds');
-const { formatTime, getFormattedDuration } = require('../utils/format');
+const { formatTime, getFormattedDuration, getTrackUrl } = require('../utils/format');
 const { getEmoji } = require('../utils/emojis');
 const { getBotFooter } = require('../utils/branding');
 //
@@ -19,7 +19,7 @@ function generateQueuePages(player, guildId, guild, channel) {
     const totalDuration = formatTime(totalDurationMs);
 
     const loopStatus = player.loop === 'queue'
-        ? (getEmoji('star', guild, channel) || '🔁')
+        ? (getEmoji('loop', guild, channel) || '🔁')
         : (getEmoji('headphones', guild, channel) || '🎵');
 
     const voiceChannel = client.channels.cache.get(player.voiceChannelId);
@@ -32,7 +32,7 @@ function generateQueuePages(player, guildId, guild, channel) {
             const globalIndex = i + index;
             const name = track.title || track.name || 'Unknown';
             const truncatedName = name.length > 45 ? name.substring(0, 45) + '...' : name;
-            const url = track.uri || track.url || '#';
+            const url = getTrackUrl(track);
             const duration = getFormattedDuration(track);
             const currentPos = Math.max(0, manualPos);
 
@@ -64,14 +64,14 @@ async function execute(message, args) {
     const queuePlayer = manager.players.get(message.guild.id);
     if (!queuePlayer || (!queuePlayer.current && queuePlayer.queue.tracks.length === 0)) {
         return message.channel.send({
-            embeds: [createEmbed(`${getEmoji('star', guild, channel)} Queue Status`, 'The queue is currently empty', '#FFA500')]
+            embeds: [createEmbed(`${getEmoji('headphones', guild, channel)} Queue Status`, 'The queue is currently empty', '#FFA500')]
         });
     }
 
     const pages = generateQueuePages(queuePlayer, message.guild.id, guild, channel);
     if (pages.length === 0) {
         return message.channel.send({
-            embeds: [createEmbed(`${getEmoji('star', guild, channel)} Queue Status`, 'The queue is currently empty', '#FFA500')]
+            embeds: [createEmbed(`${getEmoji('headphones', guild, channel)} Queue Status`, 'The queue is currently empty', '#FFA500')]
         });
     }
 
