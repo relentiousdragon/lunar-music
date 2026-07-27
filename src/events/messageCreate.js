@@ -48,6 +48,10 @@ register('help', help);
 
 const system = require('../commands/system');
 register('sr', system);
+
+const credits = require('../commands/credits');
+register('credits', credits);
+const { checkRateLimit } = require('../utils/rateLimit');
 //
 function getPrefixes() {
     const envPrefixes = process.env.BOT_PREFIXES;
@@ -93,6 +97,18 @@ function registerMessageCreate() {
         }
 
         try {
+            const rateLimitCommand = command === 'play' ? 'play'
+                : command === 'skip' ? 'skip'
+                    : command === 'seek' ? 'seek'
+                        : Object.prototype.hasOwnProperty.call(require('../commands/filters'), command) ? 'filter' : null;
+            const retryAfter = checkRateLimit(message, rateLimitCommand);
+            if (retryAfter) {
+                return message.channel.send({ embeds: [createEmbed(
+                    `${getEmoji('xmark', message.guild, message.channel)} Slow Down`,
+                    `Please wait **${Math.ceil(retryAfter / 1000)}s** before using this command again.`,
+                    '#FFA500'
+                )] });
+            }
             await handler.execute(message, args);
         } catch (error) {
             handleError(message, error);
@@ -100,5 +116,5 @@ function registerMessageCreate() {
     });
 }
 //
-module.exports = { registerMessageCreate };
+module.exports = { registerMessageCreate, commands };
 // contributors: @relentiousdragon
