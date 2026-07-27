@@ -1,11 +1,11 @@
 const { ActivityType, Events } = require('discord.js');
-const { Connectors } = require('moonlink.js');
 const client = require('../client');
 const manager = require('../manager');
 const { playerStates, stallHistory } = require('../state');
 const { createEmbed } = require('../utils/embeds');
 const { setVoiceChannelStatus } = require('../utils/voice');
 const { getEmoji } = require('../utils/emojis');
+const { registerSlashCommands } = require('./interactionCreate');
 
 const statuses = [
     { type: ActivityType.Listening, text: 'ln.help' },
@@ -41,11 +41,12 @@ function registerReadyEvent() {
         console.log(`[bot] logged in as ${client.user.tag}`);
 
         try {
-            manager.use(new Connectors.DiscordJs(), client);
-            console.log('[manager] initialized with discord.js connector');
+            await registerSlashCommands();
         } catch (err) {
-            console.log(`[manager] init error: ${err.message} - music may not work until a node connects`);
+            console.log(`[commands] slash registration failed: ${err.message}`);
         }
+
+        console.log('[manager] initialized moonlink manager');
 
         const updatePresence = () => {
             const { type, text } = statuses[Math.floor(Math.random() * statuses.length)];
@@ -224,13 +225,13 @@ async function triggerStallRecovery(guildId, player, lastState) {
                     guildId,
                     voiceChannelId: vc?.id || player.voiceChannelId,
                     textChannelId: textChannel?.id || player.textChannelId,
-                    selfDeaf: true,
                     volume: 100
                 });
-                await newPlayer.connect();
+                await newPlayer.connect({ selfDeaf: true });
 
                 if (currentTrack) {
-                    await newPlayer.play({ track: currentTrack, startTime: pos });
+                    newPlayer.queue.add(currentTrack);
+                    await newPlayer.play({ position: pos });
                 }
                 if (savedQueue.length > 0) {
                     newPlayer.queue.add(savedQueue);
