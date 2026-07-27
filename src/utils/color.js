@@ -33,7 +33,7 @@ function rgbToHex(r, g, b) {
 }
 
 function getPlatformColor(track) {
-    const uri = track.uri || '';
+    const uri = track.uri || track.url || '';
     if (uri.includes('spotify')) return '#1DB954';
     if (uri.includes('soundcloud')) return '#FF5500';
     if (uri.includes('deezer')) return '#c830c6ff';
