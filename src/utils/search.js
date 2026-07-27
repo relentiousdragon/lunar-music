@@ -1,7 +1,7 @@
 const manager = require('../manager');
 const { searchFailures } = require('../state');
 const logger = require('./logger');
-const { supports, markUnavailable, getUnavailableReason } = require('./capabilities');
+const { capabilities, supports, markUnavailable, getUnavailableReason } = require('./capabilities');
 
 const SOURCE_ORDER = ['spotify', 'tdsearch', 'soundcloud', 'amsearch', 'deezer'];
 const DISALLOWED_QUERY = /(youtube\.com|youtu\.be|ytsearch:|youtube:)/i;
@@ -34,6 +34,12 @@ async function searchWithRetry(player, query, requester, source = null) {
     if (DISALLOWED_QUERY.test(query)) {
         console.log(`[search] blocked disallowed video platform query from ${requesterId(requester)}`);
         return { loadType: 'empty', tracks: [], isEmpty: true, error: 'Video platform playback is disabled' };
+    }
+
+    if (capabilities.nodeType === 'Lavalink' && !/^https?:\/\//i.test(query)) {
+        const error = new Error('Text search is unavailable on standard Lavalink. Please provide a direct supported-source URL or use a NodeLink node.');
+        logger.warn('search_unavailable', { nodeType: capabilities.nodeType, query, reason: error.message });
+        return { loadType: 'error', tracks: [], error };
     }
 
     const sources = source ? [source] : (/^https?:\/\//i.test(query) ? [null] : SOURCE_ORDER);
