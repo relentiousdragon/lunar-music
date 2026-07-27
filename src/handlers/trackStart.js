@@ -2,7 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const client = require('../client');
 const manager = require('../manager');
 const { playerStates, colorCache, acquireLyricsSlot, releaseLyricsSlot } = require('../state');
-const { formatTime, getFormattedDuration, getRequesterId } = require('../utils/format');
+const { formatTime, getFormattedDuration, getTrackUrl, getRequesterId } = require('../utils/format');
 const { getDominantColor, getPlatformColor } = require('../utils/color');
 const { getPlatformEmoji, fetchTrackMetadata } = require('../utils/metadata');
 const { fetchLyrics } = require('../utils/lyrics');
@@ -84,7 +84,7 @@ function registerTrackStart() {
         const platformEmoji = getPlatformEmoji(track, textChannel?.guild, textChannel);
         let color = getPlatformColor(track);
 
-        const art = track.artworkUrl || track.thumbnail;
+        const art = track.artworkUrl;
 
         const applyColorAndSend = async () => {
             if (art) {
@@ -116,7 +116,7 @@ function registerTrackStart() {
 
             const embed = new EmbedBuilder()
                 .setTitle('Now Playing')
-                .setDescription(`${platformEmoji} [${track.title}](${track.uri})`)
+                .setDescription(`${platformEmoji} [${track.title}](${getTrackUrl(track)})`)
                 .addFields(
                     { name: 'Duration', value: `\`${trackLen ? formatTime(trackLen) : 'Unknown'}\``, inline: true },
                     { name: 'Requested By', value: `<@${getRequesterId(track)}>${heartEmoji}`, inline: true }
