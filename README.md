@@ -212,7 +212,7 @@ lunar-music/
 ## notes
 
 - **youtube is not supported.** youtube links and searches are blocked and cannot be enabled.
-- **NodeLink vs Lavalink**: We use **NodeLink**, not Lavalink. If you connect to a standard Lavalink node instead of NodeLink, search queries will not work and users will have to use direct links. Some other features may also break.
+- **NodeLink vs Lavalink**: The Bot uses **NodeLink**, not Lavalink. If you connect to a standard Lavalink node instead of NodeLink, search queries will not work and users will have to use direct links. Some other features may also break.
 - **process supervisor (`bot.js`)**: the bot runs as a child process managed by `bot.js`. executing `l.sr` or encountering an unexpected crash causes `bot.js` to automatically restart the bot child process.
 - **crash logging & limits**: crash trace logs are automatically written to `logs/error.log`. automatic restarts are limited to a maximum of 10 restarts per hour to prevent infinite crash loops.
 - synced lyrics are powered by [lrclib.net](https://lrclib.net) - a free, open-source lyrics api. the `MAX_SYNCED_LYRICS_PLAYERS` setting limits how many guilds can have live lyrics at the same time to avoid hitting rate limits.
