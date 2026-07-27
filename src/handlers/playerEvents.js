@@ -78,7 +78,7 @@ function registerPlayerEvents() {
         }
     });
 
-    manager.on('playerDisconnect', (player) => {
+    manager.on('playerDisconnected', (player) => {
         const guildId = player.guildId;
         releaseLyricsSlot(guildId);
         const stateBreaking = playerStates.get(guildId)?.isBreaking;
