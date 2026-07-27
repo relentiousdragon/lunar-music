@@ -1,0 +1,242 @@
+const { EmbedBuilder } = require('discord.js');
+const manager = require('../manager');
+const client = require('../client');
+const { playerStates, selectionCollectors, colorCache } = require('../state');
+const { createEmbed } = require('../utils/embeds');
+const { getFormattedDuration, getRequesterId } = require('../utils/format');
+const { getDominantColor, getPlatformColor } = require('../utils/color');
+const { getPlatformEmoji } = require('../utils/metadata');
+const { searchWithRetry } = require('../utils/search');
+const { getEmoji } = require('../utils/emojis');
+const { getBotFooter } = require('../utils/branding');
+//
+async function execute(message, args) {
+    try {
+        const guild = message.guild;
+        const channel = message.channel;
+
+        if (!message.member.voice.channel) {
+            return message.channel.send({
+                embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Voice Channel Required`, 'You must be in a voice channel to play music!', '#FFA500')]
+            });
+        }
+
+        const flags = args.filter(arg => arg.startsWith('--')).map(arg => arg.toLowerCase());
+        const showResults = flags.includes('--sr') || flags.includes('--show-results');
+        const useSoundcloud = flags.includes('--sc') || flags.includes('--soundcloud');
+        const useDeezer = flags.includes('--dz') || flags.includes('--deezer');
+        const useAppleMusic = flags.includes('--am') || flags.includes('--apple');
+        const useTidal = flags.includes('--td') || flags.includes('--tidal');
+
+        const query = args.filter(arg => !arg.startsWith('--')).join(' ');
+        if (!query) {
+            return message.channel.send({
+                embeds: [createEmbed(`${getEmoji('star', guild, channel)} Missing Query`, 'Please provide a song name or URL!', '#FFA500')]
+            });
+        }
+
+        if (/youtube\.com|youtu\.be/i.test(query)) {
+            return message.channel.send({
+                embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Unsupported Platform`, 'YouTube playback is not supported.', '#FF0000')]
+            });
+        }
+
+        let player = manager.players.get(message.guild.id);
+
+        if (player && player.voiceChannelId !== message.member.voice.channel.id) {
+            return message.channel.send({
+                embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Channel Mismatch`, 'You must be in the same voice channel as the bot!', '#FFA500')]
+            });
+        }
+
+        const loadingMsg = await message.channel.send({
+            content: `${getEmoji('loading', guild, channel)} Searching...`
+        });
+
+        try {
+            if (!player) {
+                if (manager.nodes.length === 0) {
+                    throw new Error('No nodes configured. Please wait a moment or check configuration.');
+                }
+
+                player = manager.players.create({
+                    guildId: message.guild.id,
+                    voiceChannelId: message.member.voice.channel.id,
+                    textChannelId: message.channel.id,
+                    selfDeaf: true,
+                    volume: 100,
+                    autoPlay: false
+                });
+                await player.connect();
+            } else {
+                player.textChannelId = message.channel.id;
+            }
+
+            let source = 'spotify';
+            if (!/^https?:\/\//i.test(query)) {
+                if (useSoundcloud) source = 'soundcloud';
+                else if (useDeezer) source = 'deezer';
+                else if (useAppleMusic) source = 'applemusic';
+                else if (useTidal) source = 'tidal';
+            }
+
+            const result = await searchWithRetry(player, query, message.author, source);
+
+            if (result.isEmpty || result.isError || !result.tracks?.length) {
+                await loadingMsg.edit({
+                    content: '',
+                    embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} No Results`, 'No tracks found for your query!', '#FF0000')]
+                });
+                return;
+            }
+
+            let tracksToPlay = [];
+
+            if (showResults && result.isSearch && result.tracks.length > 1) {
+                const top5 = result.tracks.slice(0, 5);
+                const selectEmbed = new EmbedBuilder()
+                    .setTitle(`${getEmoji('star', guild, channel)} Select a Track`)
+                    .setDescription(top5.map((t, i) => `**${i + 1}.** ${t.author || 'Unknown'} - [${t.title}](${t.uri}) \`(${getFormattedDuration(t)})\``).join('\n'))
+                    .setColor('#6A5ACD')
+                    .setFooter({ text: 'Selection expires in 60s | Type 1-5 to select' });
+
+                await loadingMsg.edit({ content: '', embeds: [selectEmbed], components: [] });
+
+                if (selectionCollectors.has(message.author.id)) {
+                    selectionCollectors.get(message.author.id).stop('new_selection');
+                }
+
+                const collector = message.channel.createMessageCollector({
+                    filter: m => m.author.id === message.author.id && ['1', '2', '3', '4', '5'].includes(m.content) && parseInt(m.content) <= top5.length,
+                    time: 60000,
+                    max: 1
+                });
+
+                selectionCollectors.set(message.author.id, collector);
+
+                const selected = await new Promise(resolve => {
+                    collector.on('collect', m => {
+                        const index = parseInt(m.content) - 1;
+                        try { m.delete().catch(() => { }); } catch (e) { }
+                        resolve(top5[index]);
+                    });
+                    collector.on('end', (collected, reason) => {
+                        selectionCollectors.delete(message.author.id);
+                        if (reason !== 'limit') resolve(null);
+                    });
+                });
+
+                if (!selected) {
+                    try { await loadingMsg.delete().catch(() => { }); } catch (e) { }
+                    return;
+                }
+
+                tracksToPlay = [selected];
+            } else {
+                tracksToPlay = result.isPlaylist ? result.tracks : [result.tracks[0]];
+            }
+
+            const wasEmpty = !player.current && player.queue.tracks.length === 0;
+
+            if (result.isPlaylist) {
+                result.tracks.forEach(t => {
+                    if (!t.userData) t.userData = {};
+                    t.userData.requester = message.author;
+                });
+                player.queue.add(result.tracks);
+                await loadingMsg.delete().catch(() => { });
+
+                if (!wasEmpty) {
+                    const embed = new EmbedBuilder()
+                        .setTitle(`${getEmoji('checkmark', guild, channel)} Added Playlist to Queue`)
+                        .setDescription(`Added **${result.tracks.length}** tracks from **${result.playlist?.name || 'Playlist'}**`)
+                        .setColor('#00FF00')
+                        .setFooter(getBotFooter())
+                        .setTimestamp();
+                    message.channel.send({ embeds: [embed] });
+                }
+            } else {
+                const track = tracksToPlay[0];
+                if (!track.userData) track.userData = {};
+                track.userData.requester = message.author;
+                player.queue.add(track);
+
+                try { await loadingMsg.delete(); } catch { }
+
+                if (!wasEmpty) {
+                    const platformEmoji = getPlatformEmoji(track, guild, channel);
+                    const art = track.artworkUrl || track.thumbnail;
+
+                    const sendAddedEmbed = async () => {
+                        let embedColor = '#00FF00';
+                        if (art) {
+                            if (colorCache.has(art)) {
+                                embedColor = colorCache.get(art);
+                            } else {
+                                try {
+                                    const domColor = await getDominantColor(art);
+                                    if (domColor) {
+                                        embedColor = domColor;
+                                        colorCache.set(art, domColor);
+                                    }
+                                } catch (e) { }
+                            }
+                        }
+
+                        const embed = new EmbedBuilder()
+                            .setTitle(`${getEmoji('checkmark', guild, channel)} Added to Queue`)
+                            .setDescription(`${platformEmoji} [${track.title}](${track.uri})`)
+                            .setColor(embedColor)
+                            .addFields(
+                                { name: 'Duration', value: `\`${getFormattedDuration(track)}\``, inline: true },
+                                { name: 'Requested By', value: `<@${message.author.id}>`, inline: true }
+                            )
+                            .setFooter(getBotFooter())
+                            .setTimestamp();
+
+                        if (art) embed.setThumbnail(art);
+                        message.channel.send({ embeds: [embed] });
+                    };
+
+                    sendAddedEmbed();
+                }
+            }
+
+            if (!player.playing && !player.paused) {
+                try {
+                    await player.play();
+                } catch (e) {
+                    console.log(`[play] playback start failed: ${e.message}`);
+                    message.channel.send({ embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Playback Error`, `Could not start playback: ${e.message}`, '#FF0000')] });
+                }
+            }
+
+        } catch (error) {
+            console.log(`[play] error: ${error.message}`);
+            try {
+                if (loadingMsg) {
+                    await loadingMsg.edit({
+                        content: '',
+                        embeds: [createEmbed(
+                            `${getEmoji('xmark', guild, channel)} Playback Failed`,
+                            error.message.includes('No result returned')
+                                ? 'The track could not be played (no result returned)'
+                                : `${error.message}`,
+                            '#FF0000'
+                        )]
+                    });
+                }
+            } catch (editErr) {
+                message.channel.send({
+                    embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Playback Failed`, `${error.message}`, '#FF0000')]
+                });
+            }
+        }
+    } catch (error) {
+        const { handleError } = require('../utils/embeds');
+        handleError(message, error, 'Failed to process command');
+    }
+}
+//
+module.exports = { execute, aliases: ['p'] };
+// contributors: @relentiousdragons
