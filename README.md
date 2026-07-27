@@ -65,12 +65,13 @@ open `.env` and add:
 |------------------------------|---------------------------------------------------------|----------|
 | `DISCORD_TOKEN`              | your bot token                                          | yes      |
 | `DISCORD_APPLICATION_ID`     | optional application ID; otherwise fetched from the bot | no       |
-| `DEV_USER_IDS`               | comma-separated Discord user IDs allowed to use `sr`    | yes      |
+| `DEV_USER_IDS`               | comma-separated Discord user IDs allowed to use `l.sr`  | no       |
 | `NODELINK_NODES`             | nodelink node config (see format below)                 | yes      |
 | `SPOTIFY_CLIENT_ID`          | optional Spotify Web API client ID                      | no       |
 | `SPOTIFY_CLIENT_SECRET`      | optional Spotify Web API client secret                  | no       |
 | `SPOTIFY_ACCESS_TOKEN`       | optional Spotify access token                           | no       |
 | `BOT_NAME`                   | bot branding shown in embeds and Moonlink connector     | no       |
+| `LOG_FORMAT`                 | console log format: `pretty` (default) or `json`        | no       |
 | `DISCORD_GUILD_ID`           | optional guild ID for slash-command registration        | no       |
 | `BOT_PREFIXES`               | command prefixes, comma-separated (default: `ln.,l.`)   | no       |
 | `SYNCED_LYRICS_ENABLED`      | enable/disable synced lyrics (default: `true`)          | no       |
@@ -220,7 +221,7 @@ lunar-music/
 
 - **youtube is not supported.** youtube links and searches are blocked and cannot be enabled.
 - **NodeLink vs Lavalink**: The Bot uses **NodeLink**. If you connect to a standard Lavalink node instead of NodeLink, some features may not work. If search breaks, try using direct links.
-- **process supervisor (`bot.js`)**: the bot runs as a child process managed by `bot.js`. executing `l.sr` or `/sr` by a configured developer, or encountering an unexpected crash, causes `bot.js` to automatically restart the bot child process. `restart`/`fix` only restarts the current guild's player.
+- **process supervisor (`bot.js`)**: the bot runs as a child process managed by `bot.js`. executing `l.sr` by a configured developer, or encountering an unexpected crash, causes `bot.js` to automatically restart the bot child process. `restart`/`fix` only restarts the current guild's player.
 - **crash logging & limits**: crash trace logs are automatically written to `logs/error.log`. automatic restarts are limited to a maximum of 10 restarts per hour to prevent infinite crash loops.
 - synced lyrics are powered by [lrclib.net](https://lrclib.net) - a free, open-source lyrics api. the `MAX_SYNCED_LYRICS_PLAYERS` setting limits how many guilds can have live lyrics at the same time to avoid hitting rate limits.
 - the bot takes a 60-second connection break every hour of continuous playback to keep the audio stream stable.
