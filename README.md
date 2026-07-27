@@ -1,5 +1,6 @@
 # Lunar music
 
+![now playing](assets/banner.png)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-5865F2?logo=discord&logoColor=white)](https://discord.js.org)
 [![moonlink.js](https://img.shields.io/badge/moonlink.js-v4-blueviolet)](https://github.com/Ecliptia/moonlink.js)
 [![node](https://img.shields.io/badge/node-≥18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
