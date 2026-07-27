@@ -3,11 +3,27 @@ const { playerStates } = require('../state');
 const { createEmbed } = require('../utils/embeds');
 const { updateNowPlayingEmbed } = require('../utils/filters');
 const { getEmoji } = require('../utils/emojis');
+
+async function applyFilterToPlayer(player, enabled, applyFn, clearFn) {
+    if (enabled) applyFn(player);
+    else clearFn(player);
+    await player.filters.apply();
+}
 //
 async function executeFilter(message, filterName, applyFn, clearFn) {
     const player = manager.players.get(message.guild.id);
     if (!player) {
         return message.channel.send({ embeds: [createEmbed(`${getEmoji('xmark', message.guild, message.channel)} Nothing Playing`, 'Start something first!', '#FF0000')] });
+    }
+
+    if (filterName === 'echo' && !player.node?.isNodeLink) {
+        return message.channel.send({
+            embeds: [createEmbed(
+                `${getEmoji('xmark', message.guild, message.channel)} Filter Unavailable`,
+                'Echo is unavailable because the connected node is standard Lavalink. Use a NodeLink node for this filter.',
+                '#FFA500'
+            )]
+        });
     }
 
     const state = playerStates.get(message.guild.id) || {};
@@ -22,13 +38,7 @@ async function executeFilter(message, filterName, applyFn, clearFn) {
 
     playerStates.set(message.guild.id, state);
 
-    if (state[filterName]) {
-        applyFn(player);
-    } else {
-        clearFn(player);
-    }
-
-    await player.filters.apply();
+    await applyFilterToPlayer(player, state[filterName], applyFn, clearFn);
     await updateNowPlayingEmbed(message.guild.id);
 
     const displayName = filterName.charAt(0).toUpperCase() + filterName.slice(1);
@@ -88,7 +98,7 @@ const filters = {
     },
     echo: {
         execute: (msg) => executeFilter(msg, 'echo',
-            p => p.filters.setEcho({ delay: 0.5, decay: 0.5 }),
+            p => p.filters.setEcho({ echoLength: 0.5, decay: 0.5 }),
             p => p.filters.setEcho(null)
         ),
         aliases: []
@@ -103,4 +113,5 @@ const filters = {
 };
 //
 module.exports = filters;
+Object.defineProperty(module.exports, 'applyFilterToPlayer', { value: applyFilterToPlayer, enumerable: false });
 // contributors: @relentiousdragon
