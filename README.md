@@ -1,5 +1,5 @@
 # Lunar music
-
+### In early testing stage
 ![now playing](assets/banner.png)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-5865F2?logo=discord&logoColor=white)](https://discord.js.org)
 [![moonlink.js](https://img.shields.io/badge/moonlink.js-v4-blueviolet)](https://github.com/Ecliptia/moonlink.js)
@@ -220,7 +220,7 @@ lunar-music/
 ## notes
 
 - **youtube is not supported.** youtube links and searches are blocked and cannot be enabled.
-- **NodeLink vs Lavalink**: Text search is available only with **NodeLink**. Standard Lavalink nodes must be given direct URLs for sources they support; the bot will reject text searches before sending them to the node.
+- **NodeLink vs Lavalink**: The Bot uses **NodeLink**. If you connect to a standard Lavalink node instead of NodeLink, some features may not work. If search breaks, try using direct links.
 - **process supervisor (`bot.js`)**: the bot runs as a child process managed by `bot.js`. executing `l.sr` by a configured developer, or encountering an unexpected crash, causes `bot.js` to automatically restart the bot child process. `restart`/`fix` only restarts the current guild's player.
 - **crash logging & limits**: crash trace logs are automatically written to `logs/error.log`. automatic restarts are limited to a maximum of 10 restarts per hour to prevent infinite crash loops.
 - synced lyrics are powered by [lrclib.net](https://lrclib.net) - a free, open-source lyrics api. the `MAX_SYNCED_LYRICS_PLAYERS` setting limits how many guilds can have live lyrics at the same time to avoid hitting rate limits.
