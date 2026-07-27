@@ -39,6 +39,8 @@ uses **NodeLink** for audio streaming - you have to host or supply the bot with 
 
 ## Setup
 
+[![Deploy on Bot-Hosting](https://bot-hosting.net/assets/deploy-badge.svg)](https://bot-hosting.net/deploy?source=template&template=lunar-music&aff=agentzzrp)
+
 ### what you need
 
 - [node.js](https://nodejs.org) v20 or higher
