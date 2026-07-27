@@ -3,7 +3,7 @@ const { getBotName } = require('./branding');
 //
 function getPlatformEmoji(track, guild = null, channel = null) {
     const source = (track?.sourceName || '').toLowerCase();
-    const uri = (track?.uri || '').toLowerCase();
+    const uri = (track?.uri || track?.url || '').toLowerCase();
 
     if (source.includes('spotify') || uri.includes('spotify')) return getEmoji('spotify', guild, channel);
     if (source.includes('soundcloud') || uri.includes('soundcloud')) return getEmoji('soundcloud', guild, channel);
@@ -54,4 +54,4 @@ async function fetchTrackMetadata(trackTitle, artistName) {
 }
 //
 module.exports = { getPlatformEmoji, fetchTrackMetadata };
-// contributors: @relentiousdragon// contributors: @relentiousdragon
+// contributors: @relentiousdragon
