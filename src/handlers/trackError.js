@@ -6,10 +6,10 @@ const { getEmoji } = require('../utils/emojis');
 const { getBotFooter } = require('../utils/branding');
 //
 function registerTrackError() {
-    manager.on('trackError', (player, track, error) => {
+    manager.on('trackException', (player, track, exception) => {
         const guildId = player.guildId;
         const trackInfo = track || {};
-        console.log(`[player] track error in ${guildId}: "${trackInfo.title || 'unknown'}" - ${error?.message || error}`);
+        console.log(`[player] track error in ${guildId}: "${trackInfo.title || 'unknown'}" - ${exception?.message || exception}`);
 
         const state = playerStates.get(guildId);
         if (!state?.isBreaking) {
