@@ -1,5 +1,61 @@
-const { Manager } = require('moonlink.js');
+const { Manager, Connectors } = require('moonlink.js');
+const client = require('./client');
+const packageInfo = require('../package.json');
+const { getBotName } = require('./utils/branding');
+const logger = require('./utils/logger');
+const { updateFromNode } = require('./utils/capabilities');
 //
+const CONNECTION_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000;
+
+function applyReconnectCooldown(node, durationMs, reason) {
+    const now = Date.now();
+    const until = now + durationMs;
+    node.lunarReconnectCooldownUntil = Math.max(node.lunarReconnectCooldownUntil || 0, until);
+
+    if (node.lunarOriginalCalculateReconnectDelay) {
+        scheduleReconnectAfterCooldown(node, reason);
+        return;
+    }
+    node.lunarOriginalCalculateReconnectDelay = node.calculateReconnectDelay.bind(node);
+    node.lunarOriginalConnect = node.connect.bind(node);
+    node.calculateReconnectDelay = function calculateReconnectDelayWithCooldown() {
+        const remaining = (this.lunarReconnectCooldownUntil || 0) - Date.now();
+        if (remaining > 0) {
+            logger.warn('node_reconnect_delayed', {
+                node: this.identifier,
+                delaySeconds: Math.ceil(remaining / 1000),
+                reason
+            });
+            return remaining;
+        }
+        return this.lunarOriginalCalculateReconnectDelay();
+    };
+    node.connect = function connectWithCooldown(...args) {
+        const remaining = (this.lunarReconnectCooldownUntil || 0) - Date.now();
+        if (remaining > 0) {
+            scheduleReconnectAfterCooldown(this, reason, args);
+            return;
+        }
+        return this.lunarOriginalConnect(...args);
+    };
+    scheduleReconnectAfterCooldown(node, reason);
+}
+
+function scheduleReconnectAfterCooldown(node, reason, args = []) {
+    const remaining = Math.max(0, (node.lunarReconnectCooldownUntil || 0) - Date.now());
+    if (node.reconnectTimeout) clearTimeout(node.reconnectTimeout);
+    if (remaining === 0) return;
+    logger.warn('node_connection_blocked', {
+        node: node.identifier,
+        delaySeconds: Math.ceil(remaining / 1000),
+        reason
+    });
+    node.reconnectTimeout = setTimeout(() => {
+        node.reconnectTimeout = undefined;
+        node.connect(...args);
+    }, remaining);
+}
+
 function parseNodes() {
     const raw = process.env.NODELINK_NODES || process.env.LAVALINK_NODES || '';
     if (!raw.trim()) return [];
@@ -25,55 +81,72 @@ function parseNodes() {
 const nodes = parseNodes();
 
 if (nodes.length === 0) {
-    console.log('[manager] no nodelink nodes configured - set NODELINK_NODES in your .env');
+    throw new Error('[manager] no NodeLink nodes configured; set NODELINK_NODES in your .env');
 }
 //
 const manager = new Manager({
     nodes,
     options: {
-        clientName: 'Lunar/1.0.0',
-        reconnectAttempts: 5,
-        reconnectDelay: 10000,
-        defaultPlayer: {
-            volume: 100,
-            selfDeaf: true,
-            autoPlay: false
+        clientName: `${getBotName()}/${packageInfo.version}`,
+        node: { autoMovePlayers: true },
+        search: { defaultPlatform: 'soundcloud' },
+        sources: { disabledSources: ['youtube', 'youtubemusic'] },
+        spotify: {
+            enabled: Boolean((process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) || process.env.SPOTIFY_ACCESS_TOKEN),
+            clientId: process.env.SPOTIFY_CLIENT_ID,
+            clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+            accessToken: process.env.SPOTIFY_ACCESS_TOKEN
         },
-        node: {
-            movePlayersOnDisconnect: true
-        }
-    },
-    moonlink: {
-        options: {
-            clientName: 'Lunar/1.0.0',
-            node: {
-                autoMovePlayers: true,
-                retryAmount: 10,
-                retryDelay: 5000
-            },
-            defaultPlayer: {
-                autoPlay: false,
-                selfDeaf: true
-            }
-        }
+        defaultPlayer: { volume: 100, autoPlay: false, selfDeaf: true }
     }
 });
 
+manager.use(new Connectors.DiscordJs(), client);
+
 manager.on('nodeError', (node, error) => {
-    console.log(`[manager] node ${node.identifier} error: ${error.message}`);
+    logger.error('node_error', { node: node.identifier, error: error.message });
 });
 
-manager.on('nodeConnect', (node) => {
-    console.log(`[manager] node ${node.identifier} connected`);
+manager.on('nodeConnected', (node) => {
+    const cooldownRemaining = (node.lunarReconnectCooldownUntil || 0) - Date.now();
+    if (cooldownRemaining > 0) {
+        logger.warn('node_connection_rejected_during_cooldown', {
+            node: node.identifier,
+            delaySeconds: Math.ceil(cooldownRemaining / 1000)
+        });
+        node.socket?.close(4000, 'Reconnect cooldown active');
+        return;
+    }
+    updateFromNode(node);
+    logger.info('node_connected', { node: node.identifier, nodeLink: Boolean(node.isNodeLink) });
 });
 
-manager.on('nodeDisconnect', (node, reason) => {
-    console.log(`[manager] node ${node.identifier} disconnected: ${reason || 'unknown reason'}`);
+manager.on('nodeDisconnect', (node, code, reason) => {
+    const disconnectReason = String(reason || 'unknown reason');
+    logger.warn('node_disconnected', { node: node.identifier, code, reason: disconnectReason });
+    if (Number(code) === 4000 && /too many websocket connections|connection attempts|try again later/i.test(disconnectReason)) {
+        applyReconnectCooldown(node, CONNECTION_RATE_LIMIT_COOLDOWN_MS, 'Lavalink WebSocket connection rate limit');
+        logger.warn('node_reconnect_cooldown', {
+            node: node.identifier,
+            delayMinutes: CONNECTION_RATE_LIMIT_COOLDOWN_MS / 60000,
+            message: 'Lavalink rate-limited this bot; reconnect is delayed to avoid extending the lockout.'
+        });
+    }
 });
 
-manager.on('nodeReconnect', (node) => {
-    console.log(`[manager] node ${node.identifier} reconnecting`);
+manager.on('nodeReconnecting', (node, attempt) => {
+    logger.info('node_reconnecting', { node: node.identifier, attempt });
 });
+
+manager.on('playerConnected', player => logger.info('player_connected', {
+    guild: player.guildId,
+    node: player.node?.identifier
+}));
+
+manager.on('playerDisconnected', player => logger.info('player_disconnected', {
+    guild: player.guildId,
+    node: player.node?.identifier
+}));
 //
 module.exports = manager;
 // contributors: @relentiousdragon
