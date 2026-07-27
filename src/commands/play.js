@@ -8,6 +8,7 @@ const logger = require('../utils/logger');
 const { getDominantColor, getPlatformColor } = require('../utils/color');
 const { getPlatformEmoji } = require('../utils/metadata');
 const { searchWithRetry } = require('../utils/search');
+const { resolveSourceName } = require('../utils/capabilities');
 const { getEmoji } = require('../utils/emojis');
 const { getBotFooter } = require('../utils/branding');
 //
@@ -72,12 +73,12 @@ async function execute(message, args) {
                 player.textChannelId = message.channel.id;
             }
 
-            let source = 'spsearch';
+            let source = null;
             if (!/^https?:\/\//i.test(query)) {
-                if (useSoundcloud) source = 'scsearch';
-                else if (useDeezer) source = 'dzsearch';
-                else if (useAppleMusic) source = 'amsearch';
-                else if (useTidal) source = 'tdsearch';
+                if (useSoundcloud) source = resolveSourceName('soundcloud');
+                else if (useDeezer) source = resolveSourceName('deezer');
+                else if (useAppleMusic) source = resolveSourceName('applemusic');
+                else if (useTidal) source = resolveSourceName('tidal');
             }
 
             const result = await searchWithRetry(player, query, message.author, source);
