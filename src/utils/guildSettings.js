@@ -31,12 +31,13 @@ function clearDefaultSearchSource(guildId) {
     fs.writeFileSync(SETTINGS_PATH, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
-function getUsableDefaultSearchSource(guildId) {
+function getUsableDefaultSearchSource(guildId, fallbackSource = 'soundcloud') {
     const configured = getDefaultSearchSource(guildId);
-    if (!configured) return null;
+    const requested = configured || fallbackSource;
+    if (!requested) return null;
 
     const { supports } = require('./capabilities');
-    if (supports(configured)) return configured;
+    if (supports(requested)) return requested;
 
     const replacement = DEFAULT_SOURCE_FALLBACK_ORDER.find(source => supports(source));
     if (replacement) {
