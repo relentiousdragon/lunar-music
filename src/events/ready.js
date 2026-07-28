@@ -5,6 +5,7 @@ const { playerStates, stallHistory } = require('../state');
 const { createEmbed } = require('../utils/embeds');
 const { setVoiceChannelStatus } = require('../utils/voice');
 const { getEmoji } = require('../utils/emojis');
+const { getNodePlaybackPosition } = require('../utils/playbackPosition');
 const { registerSlashCommands } = require('./interactionCreate');
 
 const statuses = [
@@ -77,14 +78,22 @@ function startPlaybackWatchdog() {
 
             const now = Date.now();
 
-            if (!lastState.manualPos) lastState.manualPos = 0;
-            if (!lastState.lastWatchdogUpdate) lastState.lastWatchdogUpdate = now;
-
-            const delta = now - lastState.lastWatchdogUpdate;
-            lastState.manualPos += delta;
-            lastState.lastWatchdogUpdate = now;
-
-            const currentPos = lastState.manualPos;
+            const nodePosition = getNodePlaybackPosition(player, now);
+            let currentPos;
+            if (nodePosition !== null) {
+                // Keep the fallback clock aligned, but lyrics/stall detection below
+                // use the node's timestamped position rather than this local clock.
+                lastState.manualPos = nodePosition;
+                lastState.lastWatchdogUpdate = now;
+                currentPos = nodePosition;
+            } else {
+                if (!lastState.manualPos) lastState.manualPos = 0;
+                if (!lastState.lastWatchdogUpdate) lastState.lastWatchdogUpdate = now;
+                const delta = now - lastState.lastWatchdogUpdate;
+                lastState.manualPos += delta;
+                lastState.lastWatchdogUpdate = now;
+                currentPos = lastState.manualPos;
+            }
 
             if (lastState.lyrics && lastState.npMessage) {
                 const currentMillis = currentPos;
