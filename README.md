@@ -8,7 +8,7 @@
 [![Views](https://komarev.com/ghpvc/?username=relentiousdragon&repo=lunar-music&style=flat&label=views)](https://github.com/relentiousdragon/lunar-music)
 ![Commits](https://badgen.net/github/commits/relentiousdragon/lunar-music?cache=300)
 
-a discord music bot that plays from spotify, soundcloud, deezer, apple music, tidal, and more. built with [discord.js](https://discord.js.org) and [moonlink.js](https://github.com/Ecliptia/moonlink.js).
+a discord music bot that plays from youtube, spotify, soundcloud, deezer, apple music, tidal, and more. built with [discord.js](https://discord.js.org) and [moonlink.js](https://github.com/Ecliptia/moonlink.js).
 
 ![now playing](assets/now_playing.png)
 
@@ -21,7 +21,7 @@ uses **NodeLink** for audio streaming - you have to host or supply the bot with 
 ## Features
 ![vc status](assets/vc_status.png)
 
-- **multi-platform search** - spotify (default), soundcloud, deezer, apple music, tidal
+- **multi-platform search** - youtube, youtube music, soundcloud (default), spotify, deezer, apple music, tidal
 - **synced lyrics** - synced lyrics powered by [lrclib](https://lrclib.net)
 - **custom branding** - customizable bot name & dynamic embed footer branding via `.env`
 - **audio effects** - nightcore, vaporwave, tremolo, vibrato, rotation, lowpass, echo, karaoke
@@ -38,8 +38,6 @@ uses **NodeLink** for audio streaming - you have to host or supply the bot with 
 ---
 
 ## Setup
-
-[![Deploy on Bot-Hosting](https://bot-hosting.net/assets/deploy-badge.svg)](https://bot-hosting.net/deploy?source=template&template=lunar-music&aff=agentzzrp)
 
 ### what you need
 
@@ -70,7 +68,7 @@ open `.env` and add:
 | `DISCORD_TOKEN`              | your bot token                                          | yes      |
 | `DISCORD_APPLICATION_ID`     | optional application ID; otherwise fetched from the bot | no       |
 | `DEV_USER_IDS`               | comma-separated Discord user IDs allowed to use `l.sr`  | no       |
-| `NODELINK_NODES`             | nodelink node config (see format below)                 | yes      |
+| `NODELINK_NODES`             | nodelink/lavalink config (see format below)             | yes      |
 | `SPOTIFY_CLIENT_ID`          | optional Spotify Web API client ID                      | no       |
 | `SPOTIFY_CLIENT_SECRET`      | optional Spotify Web API client secret                  | no       |
 | `SPOTIFY_ACCESS_TOKEN`       | optional Spotify access token                           | no       |
@@ -155,6 +153,9 @@ use these with the `play` command to search on a specific platform:
 
 | flag                       | platform                        |
 |----------------------------|---------------------------------|
+| `--yt` / `--youtube`       | youtube                         |
+| `--ytm` / `--youtube-music`| youtube music                   |
+| `--sp` / `--spotify`       | spotify                         |
 | `--sc` / `--soundcloud`    | soundcloud                      |
 | `--dz` / `--deezer`        | deezer                          |
 | `--am` / `--apple`         | apple music                     |
@@ -223,7 +224,7 @@ lunar-music/
 
 ## notes
 
-- **youtube is not supported.** youtube links and searches are blocked and cannot be enabled.
+- use `source <platform>` (or `/source`) to set a per-server default search source; use `source auto` to restore automatic fallback.
 - **process supervisor (`bot.js`)**: the bot runs as a child process managed by `bot.js`. executing `l.sr` by a configured developer, or encountering an unexpected crash, causes `bot.js` to automatically restart the bot child process. `restart`/`fix` only restarts the current guild's player.
 - **crash logging & limits**: crash trace logs are automatically written to `logs/error.log`. automatic restarts are limited to a maximum of 10 restarts per hour to prevent infinite crash loops.
 - synced lyrics are powered by [lrclib.net](https://lrclib.net) - a free, open-source lyrics api. the `MAX_SYNCED_LYRICS_PLAYERS` setting limits how many guilds can have live lyrics at the same time to avoid hitting rate limits.
