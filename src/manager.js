@@ -90,7 +90,7 @@ const manager = new Manager({
         clientName: `${getBotName()}/${packageInfo.version}`,
         node: { autoMovePlayers: true },
         search: { defaultPlatform: 'soundcloud' },
-        sources: { disabledSources: ['youtube', 'youtubemusic'] },
+        sources: { disabledSources: [] },
         spotify: {
             enabled: Boolean((process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) || process.env.SPOTIFY_ACCESS_TOKEN),
             clientId: process.env.SPOTIFY_CLIENT_ID,
