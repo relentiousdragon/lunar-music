@@ -5,6 +5,7 @@ function getPlatformEmoji(track, guild = null, channel = null) {
     const source = (track?.sourceName || '').toLowerCase();
     const uri = (track?.uri || track?.url || '').toLowerCase();
 
+    if (source.includes('youtube') || source.includes('ytsearch') || uri.includes('youtube') || uri.includes('youtu.be')) return getEmoji('youtube', guild, channel);
     if (source.includes('spotify') || uri.includes('spotify')) return getEmoji('spotify', guild, channel);
     if (source.includes('soundcloud') || uri.includes('soundcloud')) return getEmoji('soundcloud', guild, channel);
     if (source.includes('deezer') || uri.includes('deezer')) return getEmoji('deezer', guild, channel);
