@@ -1,6 +1,6 @@
 {
   "name": "lunar-music",
-  "version": "1.6.7",
+  "version": "1.6.8",
   "description": "a discord music bot built with discord.js and moonlink.js",
   "main": "bot.js",
   "scripts": {
