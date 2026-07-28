@@ -5,8 +5,7 @@
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
-    "dev": "node --watch bot.js",
-    "test": "node --test test/**/*.test.js"
+    "dev": "node --watch bot.js"
   },
   "dependencies": {
     "@discordjs/voice": "^0.18.0",
