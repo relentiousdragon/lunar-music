@@ -19,4 +19,4 @@ function isDeveloper(message, env = process.env) {
 }
 //
 module.exports = { canControlPlayer, getDeveloperIds, isDeveloper };
-// contributors: @relentiousdragonv
+// contributors: @relentiousdragon
