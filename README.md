@@ -1,5 +1,4 @@
 # Lunar music
-### In early testing stage, feel free to create an Issue or Pull Request to contribute.
 ![now playing](assets/banner.png)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-5865F2?logo=discord&logoColor=white)](https://discord.js.org)
 [![moonlink.js](https://img.shields.io/badge/moonlink.js-v5.2.0-blueviolet)](https://github.com/Ecliptia/moonlink.js)
