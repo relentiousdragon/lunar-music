@@ -16,6 +16,8 @@ function updateFromNode(node) {
         .filter(Boolean);
     const fromInfo = Array.isArray(node?.info?.sourceManagers) ? node.info.sourceManagers : [];
     capabilities.sources = new Set(advertised.length ? advertised : fromInfo);
+
+    capabilities.unavailable.clear();
     info('node_capabilities', {
         node: node?.identifier,
         nodeType: capabilities.nodeType,
