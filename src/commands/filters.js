@@ -1,7 +1,7 @@
 const manager = require('../manager');
 const { playerStates } = require('../state');
 const { createEmbed } = require('../utils/embeds');
-const { updateNowPlayingEmbed } = require('../utils/filters');
+const { updateNowPlayingEmbed, syncFilterState } = require('../utils/filters');
 const { getEmoji } = require('../utils/emojis');
 
 async function applyFilterToPlayer(player, enabled, applyFn, clearFn) {
@@ -26,7 +26,7 @@ async function executeFilter(message, filterName, applyFn, clearFn) {
         });
     }
 
-    const state = playerStates.get(message.guild.id) || {};
+    const state = await syncFilterState(player) || playerStates.get(message.guild.id) || {};
     state[filterName] = !state[filterName];
 
     if (filterName === 'nightcore' && state.nightcore && state.vaporwave) {
