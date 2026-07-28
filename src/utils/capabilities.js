@@ -48,6 +48,7 @@ function markUnavailable(source, reason) {
 
 function supports(source) {
     if (capabilities.nodeType === 'unknown') return true;
+    if (capabilities.sources.size === 0) return !capabilities.unavailable.has(source);
     return capabilities.sources.has(source) && !capabilities.unavailable.has(source);
 }
 
