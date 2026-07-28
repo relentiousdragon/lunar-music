@@ -73,8 +73,8 @@ function registerTrackEnd() {
 
                 textChannel?.send({
                     embeds: [createEmbed(
-                        `${getEmoji('star', textChannel.guild, textChannel)} Connection Refresh`,
-                        'Taking a quick 60-second break to keep the audio stream crisp and clear...',
+                        `${getEmoji('star', textChannel.guild, textChannel)} Taking a break`,
+                        'Taking a quick 60-second break...',
                         '#6A5ACD'
                     )]
                 });
