@@ -146,6 +146,7 @@ async function searchWithRetry(player, query, requester, source = null) {
     const sources = source ? [source] : (/^https?:\/\//i.test(query) ? [null] : getSourceOrder());
     let lastResult = { loadType: 'empty', tracks: [] };
     const attemptedFamilies = new Set();
+    let hasReconnectableFailure = false;
 
     for (const requestedSource of sources) {
         for (const currentSource of sourceCandidates(requestedSource)) {
@@ -201,11 +202,13 @@ async function searchWithRetry(player, query, requester, source = null) {
                         ? 'The Lavalink provider refused this request; commonly source/plugin blocking, provider policy, or invalid node credentials.'
                         : undefined
                 });
+                if (!details.status || details.status >= 500) hasReconnectableFailure = true;
                 lastResult = { loadType: 'error', tracks: [], error };
             }
         }
     }
 
+    if (!hasReconnectableFailure) return lastResult;
     searchFailures.push(Date.now());
     while (searchFailures.length && Date.now() - searchFailures[0] > 120000) searchFailures.shift();
     if (searchFailures.length >= 2) {
