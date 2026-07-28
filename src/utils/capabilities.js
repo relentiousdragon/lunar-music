@@ -32,6 +32,8 @@ function updateFromNode(node) {
 
 function resolveSourceName(platform) {
     const aliases = {
+        youtube: ['youtube', 'ytsearch'],
+        youtubemusic: ['youtubemusic', 'ytmsearch'],
         spotify: ['spotify', 'spsearch'],
         soundcloud: ['soundcloud', 'scsearch'],
         deezer: ['deezer', 'dzsearch'],
@@ -49,11 +51,30 @@ function markUnavailable(source, reason) {
 function supports(source) {
     if (capabilities.nodeType === 'unknown') return true;
     if (capabilities.sources.size === 0) return !capabilities.unavailable.has(source);
-    return capabilities.sources.has(source) && !capabilities.unavailable.has(source);
+    return getAliases(source).some(alias => capabilities.sources.has(alias)) && !capabilities.unavailable.has(source);
 }
 
 function getUnavailableReason(source) {
     return capabilities.unavailable.get(source);
+}
+
+function getAliases(source) {
+    return {
+        youtube: ['youtube', 'ytsearch'],
+        ytsearch: ['youtube', 'ytsearch'],
+        youtubemusic: ['youtubemusic', 'ytmsearch', 'youtube'],
+        ytmsearch: ['youtubemusic', 'ytmsearch', 'youtube'],
+        spotify: ['spotify', 'spsearch'],
+        spsearch: ['spotify', 'spsearch'],
+        soundcloud: ['soundcloud', 'scsearch'],
+        scsearch: ['soundcloud', 'scsearch'],
+        deezer: ['deezer', 'dzsearch'],
+        dzsearch: ['deezer', 'dzsearch'],
+        applemusic: ['applemusic', 'amsearch'],
+        amsearch: ['applemusic', 'amsearch'],
+        tidal: ['tidal', 'tdsearch'],
+        tdsearch: ['tidal', 'tdsearch']
+    }[source] || [source];
 }
 //
 module.exports = { capabilities, updateFromNode, resolveSourceName, markUnavailable, supports, getUnavailableReason };
