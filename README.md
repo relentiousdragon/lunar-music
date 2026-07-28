@@ -45,7 +45,7 @@ uses **NodeLink** for audio streaming - you have to host or supply the bot with 
 
 - [node.js](https://nodejs.org) v20 or higher
 - a discord bot token ([create one here](https://discord.com/developers/applications))
-- a **NodeLink** node (standard Lavalink nodes are NOT recommended - see notes below)
+- a **NodeLink/Lavalink** node
 
 ### install
 
@@ -224,7 +224,6 @@ lunar-music/
 ## notes
 
 - **youtube is not supported.** youtube links and searches are blocked and cannot be enabled.
-- **NodeLink vs Lavalink**: The Bot uses **NodeLink**. If you connect to a standard Lavalink node instead of NodeLink, some features may not work. If search breaks, try using direct links.
 - **process supervisor (`bot.js`)**: the bot runs as a child process managed by `bot.js`. executing `l.sr` by a configured developer, or encountering an unexpected crash, causes `bot.js` to automatically restart the bot child process. `restart`/`fix` only restarts the current guild's player.
 - **crash logging & limits**: crash trace logs are automatically written to `logs/error.log`. automatic restarts are limited to a maximum of 10 restarts per hour to prevent infinite crash loops.
 - synced lyrics are powered by [lrclib.net](https://lrclib.net) - a free, open-source lyrics api. the `MAX_SYNCED_LYRICS_PLAYERS` setting limits how many guilds can have live lyrics at the same time to avoid hitting rate limits.
