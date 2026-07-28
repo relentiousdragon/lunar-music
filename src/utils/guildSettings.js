@@ -3,6 +3,7 @@ const path = require('path');
 
 const SETTINGS_PATH = path.join(process.cwd(), '.moonlink', 'guild-settings.json');
 const VALID_SOURCES = new Set(['youtube', 'youtubemusic', 'soundcloud', 'spotify', 'deezer', 'applemusic', 'tidal']);
+const DEFAULT_SOURCE_FALLBACK_ORDER = ['spotify', 'tidal', 'deezer', 'youtube'];
 let settings = {};
 
 try {
@@ -29,6 +30,21 @@ function clearDefaultSearchSource(guildId) {
     fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
     fs.writeFileSync(SETTINGS_PATH, `${JSON.stringify(settings, null, 2)}\n`);
 }
+
+function getUsableDefaultSearchSource(guildId) {
+    const configured = getDefaultSearchSource(guildId);
+    if (!configured) return null;
+
+    const { supports } = require('./capabilities');
+    if (supports(configured)) return configured;
+
+    const replacement = DEFAULT_SOURCE_FALLBACK_ORDER.find(source => supports(source));
+    if (replacement) {
+        setDefaultSearchSource(guildId, replacement);
+        return replacement;
+    }
+    return null;
+}
 //
-module.exports = { VALID_SOURCES, getDefaultSearchSource, setDefaultSearchSource, clearDefaultSearchSource };
+module.exports = { VALID_SOURCES, DEFAULT_SOURCE_FALLBACK_ORDER, getDefaultSearchSource, getUsableDefaultSearchSource, setDefaultSearchSource, clearDefaultSearchSource };
 // contributors: @relentiousdragon
