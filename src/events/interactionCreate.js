@@ -4,7 +4,7 @@ const { commands } = require('./messageCreate');
 const { handleError } = require('../utils/embeds');
 const { checkRateLimit } = require('../utils/rateLimit');
 const { searchWithRetry } = require('../utils/search');
-const { getDefaultSearchSource } = require('../utils/guildSettings');
+const { getUsableDefaultSearchSource } = require('../utils/guildSettings');
 const { resolveSourceName } = require('../utils/capabilities');
 const { getCachedSuggestions, cacheSuggestions, canSearchAutocomplete } = require('../utils/autocompleteCache');
 
@@ -82,7 +82,9 @@ function registerInteractionCreate() {
             const query = interaction.options.getFocused().trim();
             if (query.length < 2 || /^https?:\/\//i.test(query)) return interaction.respond([]);
             try {
-                const selectedSource = interaction.options.getString('source') || getDefaultSearchSource(interaction.guildId) || 'soundcloud';
+                const explicitSource = interaction.options.getString('source');
+                const defaultSource = getUsableDefaultSearchSource(interaction.guildId);
+                const selectedSource = explicitSource || defaultSource || 'soundcloud';
                 const source = resolveSourceName(selectedSource);
                 const cached = getCachedSuggestions(source, query);
                 if (cached) return interaction.respond(cached);
