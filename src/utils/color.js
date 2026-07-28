@@ -33,7 +33,9 @@ function rgbToHex(r, g, b) {
 }
 
 function getPlatformColor(track) {
-    const uri = track.uri || track.url || '';
+    const source = (track.sourceName || '').toLowerCase();
+    const uri = (track.uri || track.url || '').toLowerCase();
+    if (source.includes('youtube') || source.includes('ytsearch') || uri.includes('youtube') || uri.includes('youtu.be')) return '#FF0000';
     if (uri.includes('spotify')) return '#1DB954';
     if (uri.includes('soundcloud')) return '#FF5500';
     if (uri.includes('deezer')) return '#c830c6ff';
