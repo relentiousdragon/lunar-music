@@ -47,6 +47,11 @@ function setQueueTimeout(guildId, delay) {
 }
 
 function registerPlayerEvents() {
+    manager.on('playerConnected', player => {
+        const { syncFilterState } = require('../utils/filters');
+        syncFilterState(player).catch(() => { });
+    });
+
     manager.on('queueEnd', async (player) => {
         const guildId = player.guildId;
         const pState = playerStates.get(guildId);
