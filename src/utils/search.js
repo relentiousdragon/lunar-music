@@ -1,4 +1,5 @@
 const manager = require('../manager');
+const { SearchResult } = require('moonlink.js');
 const { searchFailures } = require('../state');
 const logger = require('./logger');
 const { capabilities, resolveSourceName, supports, markUnavailable, getUnavailableReason } = require('./capabilities');
@@ -7,6 +8,7 @@ const DISALLOWED_QUERY = /(youtube\.com|youtu\.be|ytsearch:|youtube:)/i;
 const DISALLOWED_SOURCES = new Set(['youtube', 'youtubemusic', 'ytsearch', 'ytmsearch']);
 const NON_SEARCH_SOURCES = new Set(['http', 'local']);
 const SUPPORTED_SOURCE_FAMILIES = new Set(['spotify', 'spsearch', 'deezer', 'dzsearch', 'applemusic', 'amsearch', 'tidal', 'tdsearch', 'soundcloud', 'scsearch']);
+const DEFAULT_TEXT_SEARCH_SOURCES = ['soundcloud'];
 const SEARCH_PREFIXES = new Map([
     ['spotify', 'spsearch'], ['spsearch', 'spsearch'],
     ['soundcloud', 'scsearch'], ['scsearch', 'scsearch'],
@@ -36,11 +38,12 @@ function getSourceOrder() {
         return SUPPORTED_SOURCE_FAMILIES.has(normalized) &&
             !DISALLOWED_SOURCES.has(normalized) && !NON_SEARCH_SOURCES.has(normalized);
     });
+    const sourceFallbacks = nodeSources.length ? [] : DEFAULT_TEXT_SEARCH_SOURCES;
     const nativeFallbacks = [];
     if (typeof manager.isSpotifyEnabled === 'function' && manager.isSpotifyEnabled()) nativeFallbacks.push('spsearch');
     if (typeof manager.isDeezerEnabled === 'function' && manager.isDeezerEnabled()) nativeFallbacks.push('dzsearch');
     const seenFamilies = new Set();
-    return [...nodeSources, ...nativeFallbacks].filter(source => {
+    return [...nodeSources, ...sourceFallbacks, ...nativeFallbacks].filter(source => {
         const family = sourceFamily(source);
         if (seenFamilies.has(family)) return false;
         seenFamilies.add(family);
@@ -89,7 +92,8 @@ function describeError(error) {
 }
 
 async function searchOnce(query, requester, source) {
-    const options = { query, requester: requesterId(requester) };
+    const searchRequester = requesterId(requester);
+    const options = { query, requester: searchRequester };
     if (source) options.source = source;
     const node = manager.nodes.findNode();
     const isDirectNodeSearch = Boolean(node && !node.isNodeLink && source && SEARCH_PREFIXES.has(source));
@@ -101,7 +105,9 @@ async function searchOnce(query, requester, source) {
         nodeType: node?.isNodeLink ? 'NodeLink' : 'Lavalink',
         identifier
     });
-    const searchPromise = isDirectNodeSearch ? node.rest.loadTracks(identifier) : manager.search(options);
+    const searchPromise = isDirectNodeSearch
+        ? node.rest.loadTracks(identifier).then(response => new SearchResult(response, searchRequester, manager.options.search?.playlistLoadLimit))
+        : manager.search(options);
     return Promise.race([
         searchPromise,
         new Promise((_, reject) => setTimeout(() => reject(new Error('search timeout after 20s')), 20000))
