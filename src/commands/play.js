@@ -11,7 +11,7 @@ const { searchWithRetry } = require('../utils/search');
 const { resolveSourceName } = require('../utils/capabilities');
 const { getEmoji } = require('../utils/emojis');
 const { getBotFooter } = require('../utils/branding');
-const { getDefaultSearchSource } = require('../utils/guildSettings');
+const { getUsableDefaultSearchSource } = require('../utils/guildSettings');
 //
 async function execute(message, args) {
     try {
@@ -81,7 +81,7 @@ async function execute(message, args) {
                 else if (useAppleMusic) source = resolveSourceName('applemusic');
                 else if (useTidal) source = resolveSourceName('tidal');
                 else {
-                    const defaultSource = getDefaultSearchSource(guild.id);
+                    const defaultSource = getUsableDefaultSearchSource(guild.id);
                     if (defaultSource) source = resolveSourceName(defaultSource);
                 }
             }
