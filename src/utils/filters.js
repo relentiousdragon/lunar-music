@@ -28,9 +28,13 @@ function hydratePlayerFilters(player, filters = {}) {
     Object.assign(player.filters, filters);
 }
 
+function getMoonlinkFilters(player) {
+    return player?.filters?.toJSON?.() || {};
+}
+
 async function syncFilterState(player, fetchFromNode = true) {
     if (!player) return null;
-    let filters = player.filters?.toJSON?.() || {};
+    let filters = getMoonlinkFilters(player);
     if (fetchFromNode && player.node?.rest?.getPlayer) {
         try {
             const remotePlayer = await player.node.rest.getPlayer(player.guildId);
@@ -101,5 +105,5 @@ async function updateNowPlayingEmbed(guildId) {
     }
 }
 //
-module.exports = { getActiveFiltersString, updateNowPlayingEmbed, syncFilterState, stateFromNodeFilters };
+module.exports = { getActiveFiltersString, updateNowPlayingEmbed, syncFilterState, stateFromNodeFilters, getMoonlinkFilters };
 // contributors: @relentiousdragon
