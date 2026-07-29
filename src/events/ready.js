@@ -5,7 +5,7 @@ const { playerStates, stallHistory } = require('../state');
 const { createEmbed } = require('../utils/embeds');
 const { setVoiceChannelStatus } = require('../utils/voice');
 const { getEmoji } = require('../utils/emojis');
-const { getNodePlaybackPosition } = require('../utils/playbackPosition');
+const { getMoonlinkPlaybackPosition, getDirectNodePlaybackPosition, refreshDirectNodePlayback, canSynchronizeWatchdog } = require('../utils/playbackPosition');
 const { registerSlashCommands } = require('./interactionCreate');
 
 const statuses = [
@@ -78,11 +78,13 @@ function startPlaybackWatchdog() {
 
             const now = Date.now();
 
-            const nodePosition = getNodePlaybackPosition(player, now);
+            let nodePosition = getMoonlinkPlaybackPosition(player, now);
+            if (nodePosition === null) {
+                void refreshDirectNodePlayback(player, lastState, now);
+                nodePosition = getDirectNodePlaybackPosition(player, lastState, now);
+            }
             let currentPos;
-            if (nodePosition !== null) {
-                // Keep the fallback clock aligned, but lyrics/stall detection below
-                // use the node's timestamped position rather than this local clock.
+            if (nodePosition !== null && canSynchronizeWatchdog(lastState.manualPos || 0, nodePosition)) {
                 lastState.manualPos = nodePosition;
                 lastState.lastWatchdogUpdate = now;
                 currentPos = nodePosition;
