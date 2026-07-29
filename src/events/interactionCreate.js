@@ -5,21 +5,58 @@ const { handleError } = require('../utils/embeds');
 const { checkRateLimit } = require('../utils/rateLimit');
 const { searchWithRetry } = require('../utils/search');
 const { getUsableDefaultSearchSource } = require('../utils/guildSettings');
-const { resolveSourceName } = require('../utils/capabilities');
-const { getCachedSuggestions, cacheSuggestions, canSearchAutocomplete } = require('../utils/autocompleteCache');
+const { capabilities, resolveSourceName } = require('../utils/capabilities');
+const { getCachedSuggestions, cacheSuggestions, canSearchAutocomplete, createSelection, consumeSelection } = require('../utils/autocompleteCache');
+const { getGlobalTopTracks } = require('../utils/stats');
 
-const definitions = [
+const SOURCE_CHOICES = [
+    ['YouTube', 'youtube'], ['YouTube Music', 'youtubemusic'], ['SoundCloud', 'soundcloud'],
+    ['Spotify', 'spotify'], ['Deezer', 'deezer'], ['Apple Music', 'applemusic'], ['Tidal', 'tidal']
+];
+const SOURCE_CAPABILITY_ALIASES = {
+    youtube: ['youtube', 'ytsearch'],
+    youtubemusic: ['youtubemusic', 'ytmsearch'],
+    soundcloud: ['soundcloud', 'scsearch'],
+    spotify: ['spotify', 'spsearch'],
+    deezer: ['deezer', 'dzsearch'],
+    applemusic: ['applemusic', 'amsearch'],
+    tidal: ['tidal', 'tdsearch']
+};
+
+function getSupportedSourceChoices() {
+    if (capabilities.nodeType === 'unknown') return [];
+    return SOURCE_CHOICES.filter(([, source]) =>
+        SOURCE_CAPABILITY_ALIASES[source].some(alias => capabilities.sources.has(alias) && !capabilities.unavailable.has(alias))
+    ).map(([name, value]) => ({ name, value }));
+}
+
+function addSourceOption(builder, name, description, includeAuto = false) {
+    const choices = getSupportedSourceChoices();
+    if (includeAuto) choices.unshift({ name: 'Automatic fallback order', value: 'auto' });
+    if (!choices.length) return builder;
+    return builder.addStringOption(option => option.setName(name).setDescription(description).addChoices(...choices));
+}
+
+function autocompleteTrackChoices(tracks, userId) {
+    return tracks.slice(0, 25).map(track => ({
+        name: `${track.author || 'Unknown'} - ${track.title}`.slice(0, 100),
+        value: createSelection(userId, { track })
+    }));
+}
+
+function autocompleteGlobalChoices(tracks, userId) {
+    return tracks.slice(0, 25).map(track => ({
+        name: `★ ${track.author ? `${track.author} - ` : ''}${track.title} (${track.count} plays)`.slice(0, 100),
+        value: createSelection(userId, { query: track.uri || `${track.author || ''} ${track.title}`.trim() })
+    }));
+}
+
+function createDefinitions() {
+    return [
     ['play', 'Play a song or playlist', b => b
-        .addStringOption(o => o.setName('query').setDescription('Song name or URL').setRequired(true).setAutocomplete(true))
-        .addStringOption(o => o.setName('source').setDescription('Search source').addChoices(
-            { name: 'YouTube', value: 'youtube' }, { name: 'YouTube Music', value: 'youtubemusic' },
-            { name: 'SoundCloud', value: 'soundcloud' }, { name: 'Spotify', value: 'spotify' },
-            { name: 'Deezer', value: 'deezer' }, { name: 'Apple Music', value: 'applemusic' }, { name: 'Tidal', value: 'tidal' }
-        ))],
-    ['source', 'View or set this server’s default search source', b => b.addStringOption(o => o.setName('platform').setDescription('Use auto to reset').addChoices(
-        { name: 'Automatic fallback order', value: 'auto' }, { name: 'YouTube', value: 'youtube' }, { name: 'YouTube Music', value: 'youtubemusic' },
-        { name: 'SoundCloud', value: 'soundcloud' }, { name: 'Spotify', value: 'spotify' }, { name: 'Deezer', value: 'deezer' }, { name: 'Apple Music', value: 'applemusic' }, { name: 'Tidal', value: 'tidal' }
-    ))],
+        .addStringOption(o => o.setName('query').setDescription('Song name or URL').setRequired(true).setAutocomplete(true)),
+        b => addSourceOption(b, 'source', 'Search source')],
+    ['source', 'View or set this server’s default search source', b => addSourceOption(b, 'platform', 'Use auto to reset', true)],
     ['node', 'Show node diagnostics (developers only)'],
     ['queue', 'Show the current queue', b => b.addIntegerOption(o => o.setName('page').setDescription('Queue page').setMinValue(1))],
     ['seek', 'Jump to a position in the current track', b => b.addStringOption(o => o.setName('position').setDescription('For example 1:30').setRequired(true))],
@@ -32,10 +69,12 @@ const definitions = [
     ['nightcore', 'Toggle nightcore'], ['vaporwave', 'Toggle vaporwave'], ['tremolo', 'Toggle tremolo'],
     ['vibrato', 'Toggle vibrato'], ['rotation', 'Toggle rotation'], ['lowpass', 'Toggle low-pass'],
     ['echo', 'Toggle echo'], ['karaoke', 'Toggle karaoke']
-].map(([name, description, addOptions]) => {
-    const builder = new SlashCommandBuilder().setName(name).setDescription(description);
-    return (addOptions ? addOptions(builder) : builder).toJSON();
-});
+    ].map(([name, description, ...addOptions]) => {
+        let builder = new SlashCommandBuilder().setName(name).setDescription(description);
+        for (const addOptionsFn of addOptions) builder = addOptionsFn(builder) || builder;
+        return builder.toJSON();
+    });
+}
 //
 function toMessage(interaction) {
     const sent = [];
@@ -71,6 +110,7 @@ async function registerSlashCommands() {
     const route = process.env.DISCORD_GUILD_ID
         ? Routes.applicationGuildCommands(client.user.id, process.env.DISCORD_GUILD_ID)
         : Routes.applicationCommands(client.user.id);
+    const definitions = createDefinitions();
     await rest.put(route, { body: definitions });
     console.log(`[commands] registered ${definitions.length} slash commands`);
 }
@@ -80,6 +120,7 @@ function registerInteractionCreate() {
         if (interaction.isAutocomplete()) {
             if (interaction.commandName !== 'play') return interaction.respond([]);
             const query = interaction.options.getFocused().trim();
+            if (!query) return interaction.respond(autocompleteGlobalChoices(getGlobalTopTracks(25), interaction.user.id));
             if (query.length < 2 || /^https?:\/\//i.test(query)) return interaction.respond([]);
             try {
                 const explicitSource = interaction.options.getString('source');
@@ -87,20 +128,17 @@ function registerInteractionCreate() {
                 const selectedSource = explicitSource || defaultSource || 'soundcloud';
                 const source = resolveSourceName(selectedSource);
                 const cached = getCachedSuggestions(source, query);
-                if (cached) return interaction.respond(cached);
+                if (cached) return interaction.respond(autocompleteTrackChoices(cached, interaction.user.id));
                 if (!canSearchAutocomplete(interaction.user.id)) return interaction.respond([]);
                 const search = searchWithRetry(null, query.slice(0, 100), interaction.user, source)
-                    .then(result => (result.tracks || []).slice(0, 10).map(track => ({
-                        name: `${track.author || 'Unknown'} - ${track.title}`.slice(0, 100),
-                        value: `${track.author || ''} ${track.title}`.trim().slice(0, 100)
-                    })));
+                    .then(result => (result.tracks || []).slice(0, 25));
                 const suggestions = await Promise.race([
                     search,
                     new Promise(resolve => setTimeout(() => resolve({ tracks: [] }), 2300))
                 ]);
                 if (Array.isArray(suggestions)) {
                     cacheSuggestions(source, query, suggestions);
-                    return interaction.respond(suggestions);
+                    return interaction.respond(autocompleteTrackChoices(suggestions, interaction.user.id));
                 }
                 search.then(results => cacheSuggestions(source, query, results)).catch(() => { });
                 return interaction.respond([]);
@@ -113,10 +151,15 @@ function registerInteractionCreate() {
         if (!handler) return interaction.reply({ content: 'Unknown command.', ephemeral: true });
         const args = [];
         if (interaction.commandName === 'play') {
-            args.push(interaction.options.getString('query'));
+            const selected = consumeSelection(interaction.options.getString('query'), interaction.user.id);
+            const message = toMessage(interaction);
+            if (selected?.track) message.autocompleteTrack = selected.track;
+            if (selected?.query) message.autocompleteQuery = selected.query;
+            args.push(selected?.query || selected?.track?.title || interaction.options.getString('query'));
             const source = interaction.options.getString('source');
             const sourceFlags = { youtube: '--yt', youtubemusic: '--ytm', soundcloud: '--sc', spotify: '--sp', deezer: '--dz', applemusic: '--am', tidal: '--td' };
             if (sourceFlags[source]) args.push(sourceFlags[source]);
+            return executeInteractionCommand(interaction, handler, args, message);
         }
         if (interaction.commandName === 'source') {
             const platform = interaction.options.getString('platform');
@@ -128,21 +171,25 @@ function registerInteractionCreate() {
             const mode = interaction.options.getString('mode');
             if (mode) args.push(mode);
         }
-        try {
+        return executeInteractionCommand(interaction, handler, args, toMessage(interaction));
+    });
+}
+
+async function executeInteractionCommand(interaction, handler, args, message) {
+    try {
             const rateLimitCommand = interaction.commandName === 'play' ? 'play'
                 : interaction.commandName === 'skip' ? 'skip'
                     : interaction.commandName === 'seek' ? 'seek'
                         : ['nightcore', 'vaporwave', 'tremolo', 'vibrato', 'rotation', 'lowpass', 'echo', 'karaoke'].includes(interaction.commandName) ? 'filter' : null;
-            const retryAfter = checkRateLimit(toMessage(interaction), rateLimitCommand);
+            const retryAfter = checkRateLimit(message, rateLimitCommand);
             if (retryAfter) {
                 return interaction.reply({ content: `Please wait ${Math.ceil(retryAfter / 1000)}s before using this command again.`, ephemeral: true });
             }
-            await handler.execute(toMessage(interaction), args);
+            await handler.execute(message, args);
         } catch (error) {
             if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'Command failed.', ephemeral: true });
-            handleError(toMessage(interaction), error);
+            handleError(message, error);
         }
-    });
 }
 //
 module.exports = { registerInteractionCreate, registerSlashCommands };
