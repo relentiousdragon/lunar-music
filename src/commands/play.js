@@ -34,7 +34,9 @@ async function execute(message, args) {
         const useAppleMusic = flags.includes('--am') || flags.includes('--apple');
         const useTidal = flags.includes('--td') || flags.includes('--tidal');
 
-        const query = args.filter(arg => !arg.startsWith('--')).join(' ');
+        const selectedTrack = message.autocompleteTrack;
+        const selectedQuery = message.autocompleteQuery;
+        const query = selectedTrack ? selectedTrack.title : (selectedQuery || args.filter(arg => !arg.startsWith('--')).join(' '));
         if (!query) {
             return message.channel.send({
                 embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Missing Query`, 'Please provide a song name or URL!', '#FFA500')]
@@ -86,7 +88,9 @@ async function execute(message, args) {
                 }
             }
 
-            const result = await searchWithRetry(player, query, message.author, source);
+            const result = selectedTrack
+                ? { loadType: 'search', tracks: [selectedTrack] }
+                : await searchWithRetry(player, query, message.author, source);
 
             if (result.loadType === 'empty' || result.loadType === 'error' || !result.tracks?.length) {
                 const reason = result.error?.message || result.error;
