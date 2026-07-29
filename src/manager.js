@@ -118,6 +118,10 @@ manager.on('nodeConnected', (node) => {
         return;
     }
     updateFromNode(node);
+    setTimeout(() => {
+        const { registerSlashCommands } = require('./events/interactionCreate');
+        registerSlashCommands().catch(error => logger.warn('slash_source_refresh_failed', { error: error.message }));
+    }, 0);
     logger.info('node_connected', { node: node.identifier, nodeLink: Boolean(node.isNodeLink) });
 });
 
