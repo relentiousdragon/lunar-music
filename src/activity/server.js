@@ -579,7 +579,7 @@ function createActivityServer() {
     }, 1000).unref();
 
     const port = Number(process.env.ACTIVITY_PORT || 3001);
-    const host = allowInsecure ? '127.0.0.1' : (process.env.ACTIVITY_HOST || '0.0.0.0');
+    const host = process.env.ACTIVITY_HOST || '0.0.0.0';
     server.listen(port, host, () => logger.info('activity_server_started', { host, port, secure: !allowInsecure }));
     return { server, broadcastGuild };
 }
