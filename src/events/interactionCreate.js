@@ -22,19 +22,23 @@ const SOURCE_CAPABILITY_ALIASES = {
     applemusic: ['applemusic', 'amsearch'],
     tidal: ['tidal', 'tdsearch']
 };
-
+//
 function getSupportedSourceChoices() {
-    if (capabilities.nodeType === 'unknown') return [];
-    return SOURCE_CHOICES.filter(([, source]) =>
+    if (capabilities.nodeType === 'unknown') {
+        return SOURCE_CHOICES.map(([name, value]) => ({ name, value }));
+    }
+    const supported = SOURCE_CHOICES.filter(([, source]) =>
         SOURCE_CAPABILITY_ALIASES[source].some(alias => capabilities.sources.has(alias) && !capabilities.unavailable.has(alias))
     ).map(([name, value]) => ({ name, value }));
+    return supported.length ? supported : SOURCE_CHOICES.map(([name, value]) => ({ name, value }));
 }
 
-function addSourceOption(builder, name, description, includeAuto = false) {
-    const choices = getSupportedSourceChoices();
-    if (includeAuto) choices.unshift({ name: 'Automatic fallback order', value: 'auto' });
-    if (!choices.length) return builder;
-    return builder.addStringOption(option => option.setName(name).setDescription(description).addChoices(...choices));
+function addSourceOption(builder, name, description) {
+    return builder.addStringOption(option =>
+        option.setName(name)
+            .setDescription(description)
+            .setAutocomplete(true)
+    );
 }
 
 function autocompleteTrackChoices(tracks, userId) {
@@ -53,22 +57,22 @@ function autocompleteGlobalChoices(tracks, userId) {
 
 function createDefinitions() {
     return [
-    ['play', 'Play a song or playlist', b => b
-        .addStringOption(o => o.setName('query').setDescription('Song name or URL').setRequired(true).setAutocomplete(true)),
-        b => addSourceOption(b, 'source', 'Search source')],
-    ['source', 'View or set this server’s default search source', b => addSourceOption(b, 'platform', 'Use auto to reset', true)],
-    ['node', 'Show node diagnostics (developers only)'],
-    ['queue', 'Show the current queue', b => b.addIntegerOption(o => o.setName('page').setDescription('Queue page').setMinValue(1))],
-    ['seek', 'Jump to a position in the current track', b => b.addStringOption(o => o.setName('position').setDescription('For example 1:30').setRequired(true))],
-    ['loop', 'Set or cycle the loop mode', b => b.addStringOption(o => o.setName('mode').setDescription('track, queue, or off').addChoices({ name: 'track', value: 'track' }, { name: 'queue', value: 'queue' }, { name: 'off', value: 'off' }))],
-    ['help', 'Show the available commands'],
-    ['credits', 'Show project credits and repository'],
-    ['skip', 'Skip the current track'], ['previous', 'Play the previous track'], ['back', 'Play the previous track'],
-    ['pause', 'Pause playback'], ['resume', 'Resume playback'], ['stop', 'Stop playback'], ['clear', 'Clear the queue'],
-    ['restart', 'Restart the player'], ['top', 'Show this server’s top tracks'], ['global', 'Show global top tracks'],
-    ['nightcore', 'Toggle nightcore'], ['vaporwave', 'Toggle vaporwave'], ['tremolo', 'Toggle tremolo'],
-    ['vibrato', 'Toggle vibrato'], ['rotation', 'Toggle rotation'], ['lowpass', 'Toggle low-pass'],
-    ['echo', 'Toggle echo'], ['karaoke', 'Toggle karaoke']
+        ['play', 'Play a song or playlist', b => b
+            .addStringOption(o => o.setName('query').setDescription('Song name or URL').setRequired(true).setAutocomplete(true)),
+            b => addSourceOption(b, 'source', 'Search source')],
+        ['source', 'View or set this server’s default search source', b => addSourceOption(b, 'platform', 'Use auto to reset')],
+        ['node', 'Show node diagnostics (developers only)'],
+        ['queue', 'Show the current queue', b => b.addIntegerOption(o => o.setName('page').setDescription('Queue page').setMinValue(1))],
+        ['seek', 'Jump to a position in the current track', b => b.addStringOption(o => o.setName('position').setDescription('For example 1:30').setRequired(true))],
+        ['loop', 'Set or cycle the loop mode', b => b.addStringOption(o => o.setName('mode').setDescription('track, queue, or off').addChoices({ name: 'track', value: 'track' }, { name: 'queue', value: 'queue' }, { name: 'off', value: 'off' }))],
+        ['help', 'Show the available commands'],
+        ['credits', 'Show project credits and repository'],
+        ['skip', 'Skip the current track'], ['previous', 'Play the previous track'], ['back', 'Play the previous track'],
+        ['pause', 'Pause playback'], ['resume', 'Resume playback'], ['stop', 'Stop playback'], ['clear', 'Clear the queue'],
+        ['restart', 'Restart the player'], ['top', 'Show this server’s top tracks'], ['global', 'Show global top tracks'],
+        ['nightcore', 'Toggle nightcore'], ['vaporwave', 'Toggle vaporwave'], ['tremolo', 'Toggle tremolo'],
+        ['vibrato', 'Toggle vibrato'], ['rotation', 'Toggle rotation'], ['lowpass', 'Toggle low-pass'],
+        ['echo', 'Toggle echo'], ['karaoke', 'Toggle karaoke']
     ].map(([name, description, ...addOptions]) => {
         let builder = new SlashCommandBuilder().setName(name).setDescription(description);
         for (const addOptionsFn of addOptions) builder = addOptionsFn(builder) || builder;
@@ -84,7 +88,7 @@ function toMessage(interaction) {
         send: async payload => {
             const result = interaction.replied || interaction.deferred
                 ? await interaction.followUp(payload)
-                : await interaction.reply({ ...payload, fetchReply: true });
+                : (await interaction.reply({ ...payload, withResponse: true })).resource?.message;
             sent.push(result);
             return result;
         },
@@ -111,7 +115,17 @@ async function registerSlashCommands() {
         ? Routes.applicationGuildCommands(client.user.id, process.env.DISCORD_GUILD_ID)
         : Routes.applicationCommands(client.user.id);
     const definitions = createDefinitions();
-    await rest.put(route, { body: definitions });
+    const existing = await rest.get(route);
+    const entryPoint = Array.isArray(existing) ? existing.find(command => command.type === 4) : null;
+    const entryPointDefinition = entryPoint && {
+        type: entryPoint.type,
+        name: entryPoint.name,
+        description: entryPoint.description,
+        handler: entryPoint.handler,
+        integration_types: entryPoint.integration_types,
+        contexts: entryPoint.contexts
+    };
+    await rest.put(route, { body: entryPointDefinition ? [...definitions, entryPointDefinition] : definitions });
     console.log(`[commands] registered ${definitions.length} slash commands`);
 }
 
@@ -119,6 +133,13 @@ function registerInteractionCreate() {
     client.on(Events.InteractionCreate, async interaction => {
         if (interaction.isAutocomplete()) {
             if (interaction.commandName !== 'play') return interaction.respond([]);
+            const focused = interaction.options.getFocused(true);
+            if (focused.name === 'source') {
+                const query = focused.value.trim().toLowerCase();
+                let choices = getSupportedSourceChoices();
+                if (query) choices = choices.filter(c => c.name.toLowerCase().includes(query) || c.value.toLowerCase().includes(query));
+                return interaction.respond(choices.slice(0, 25));
+            }
             const query = interaction.options.getFocused().trim();
             if (!query) return interaction.respond(autocompleteGlobalChoices(getGlobalTopTracks(25), interaction.user.id));
             if (query.length < 2 || /^https?:\/\//i.test(query)) return interaction.respond([]);
@@ -177,19 +198,19 @@ function registerInteractionCreate() {
 
 async function executeInteractionCommand(interaction, handler, args, message) {
     try {
-            const rateLimitCommand = interaction.commandName === 'play' ? 'play'
-                : interaction.commandName === 'skip' ? 'skip'
-                    : interaction.commandName === 'seek' ? 'seek'
-                        : ['nightcore', 'vaporwave', 'tremolo', 'vibrato', 'rotation', 'lowpass', 'echo', 'karaoke'].includes(interaction.commandName) ? 'filter' : null;
-            const retryAfter = checkRateLimit(message, rateLimitCommand);
-            if (retryAfter) {
-                return interaction.reply({ content: `Please wait ${Math.ceil(retryAfter / 1000)}s before using this command again.`, ephemeral: true });
-            }
-            await handler.execute(message, args);
-        } catch (error) {
-            if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'Command failed.', ephemeral: true });
-            handleError(message, error);
+        const rateLimitCommand = interaction.commandName === 'play' ? 'play'
+            : interaction.commandName === 'skip' ? 'skip'
+                : interaction.commandName === 'seek' ? 'seek'
+                    : ['nightcore', 'vaporwave', 'tremolo', 'vibrato', 'rotation', 'lowpass', 'echo', 'karaoke'].includes(interaction.commandName) ? 'filter' : null;
+        const retryAfter = checkRateLimit(message, rateLimitCommand);
+        if (retryAfter) {
+            return interaction.reply({ content: `Please wait ${Math.ceil(retryAfter / 1000)}s before using this command again.`, ephemeral: true });
         }
+        await handler.execute(message, args);
+    } catch (error) {
+        if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'Command failed.', ephemeral: true });
+        handleError(message, error);
+    }
 }
 //
 module.exports = { registerInteractionCreate, registerSlashCommands };
