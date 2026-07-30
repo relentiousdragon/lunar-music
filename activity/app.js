@@ -109,7 +109,7 @@ function refreshTickers() {
 function setSearchSources(search) {
   if (!search?.sources?.length) return;
   const labels = { youtube: 'YouTube', youtubemusic: 'YouTube Music', soundcloud: 'SoundCloud', spotify: 'Spotify', deezer: 'Deezer', applemusic: 'Apple Music', tidal: 'Tidal', monochrome: 'Monochrome' };
-  const icons = { spotify: 'emojis/spotify.webp', applemusic: 'emojis/apple_music.webp', deezer: 'emojis/deezer.webp', tidal: 'emojis/tidal.webp', soundcloud: 'emojis/soundcloud.webp', youtube: 'youtube.png', youtubemusic: 'youtube_music.png', monochrome: 'emojis/headphones.webp' };
+  const icons = { spotify: 'emojis/spotify.webp', applemusic: 'emojis/apple_music.webp', deezer: 'emojis/deezer.webp', tidal: 'emojis/tidal.webp', soundcloud: 'emojis/soundcloud.webp', youtube: 'emojis/youtube.png', youtubemusic: 'emojis/youtube_music.png', monochrome: 'emojis/headphones.webp' };
   const icon = source => `/assets/${icons[source] || 'emojis/headphones.webp'}`;
   const savedSource = loadState('source', null);
   const initialSource = savedSource && search.sources.includes(savedSource) ? savedSource : search.defaultSource;
