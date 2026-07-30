@@ -60,6 +60,7 @@ function registerTrackEnd() {
 
             if (state.playbackTimeSinceBreak >= 3600000 && !state.isBreaking) {
                 state.isBreaking = true;
+                state.breakUntil = Date.now() + 60000;
                 const voiceChannel = client.channels.cache.get(player.voiceChannelId);
                 const textChannel = client.channels.cache.get(player.textChannelId);
 
@@ -98,6 +99,9 @@ function registerTrackEnd() {
                         if (currentTrack) {
                             await newPlayer.play();
                         }
+
+                        const FILTER_NAMES = ['nightcore', 'vaporwave', 'tremolo', 'vibrato', 'rotation', 'lowpass', 'echo', 'karaoke'];
+                        FILTER_NAMES.forEach(name => { state[name] = false; });
 
                         state.playbackTimeSinceBreak = 0;
                         state.isBreaking = false;
