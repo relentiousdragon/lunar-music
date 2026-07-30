@@ -43,6 +43,7 @@ function registerReadyEvent() {
 
         try {
             await registerSlashCommands();
+            manager._lastSlashRegister = Date.now();
         } catch (err) {
             console.log(`[commands] slash registration failed: ${err.message}`);
         }
@@ -78,23 +79,55 @@ function startPlaybackWatchdog() {
 
             const now = Date.now();
 
+            if (lastState._needsNodeSync) {
+                let nodePos = getMoonlinkPlaybackPosition(player, now);
+                if (nodePos === null) {
+                    void refreshDirectNodePlayback(player, lastState, now);
+                    nodePos = getDirectNodePlaybackPosition(player, lastState, now);
+                }
+                if (nodePos !== null) {
+                    lastState.manualPos = nodePos;
+                    lastState.pos = nodePos;
+                    lastState.timestamp = now;
+                    lastState.lastWatchdogUpdate = now;
+                }
+                lastState._needsNodeSync = false;
+                lastState._clockEstimateMode = false;
+                lastState._clockEstimateStart = 0;
+            }
+
+            const wasClockMode = lastState._clockEstimateMode || false;
+
             let nodePosition = getMoonlinkPlaybackPosition(player, now);
             if (nodePosition === null) {
                 void refreshDirectNodePlayback(player, lastState, now);
                 nodePosition = getDirectNodePlaybackPosition(player, lastState, now);
             }
+
             let currentPos;
-            if (nodePosition !== null && canSynchronizeWatchdog(lastState.manualPos || 0, nodePosition)) {
+            const clockAdvanced = lastState._clockEstimateMode;
+
+            if (nodePosition !== null && canSynchronizeWatchdog(lastState.manualPos || 0, nodePosition, clockAdvanced)) {
                 lastState.manualPos = nodePosition;
                 lastState.lastWatchdogUpdate = now;
                 currentPos = nodePosition;
+                if (lastState._clockEstimateMode) {
+                    lastState._clockEstimateMode = false;
+                    lastState._clockEstimateStart = 0;
+                }
             } else {
                 if (!lastState.manualPos) lastState.manualPos = 0;
                 if (!lastState.lastWatchdogUpdate) lastState.lastWatchdogUpdate = now;
                 const delta = now - lastState.lastWatchdogUpdate;
-                lastState.manualPos += delta;
+                const safeDelta = Math.min(delta, 5000);
+                const speed = lastState.nightcore ? 1.15 : lastState.vaporwave ? 0.85 : 1.0;
+                lastState.manualPos += safeDelta * speed;
                 lastState.lastWatchdogUpdate = now;
                 currentPos = lastState.manualPos;
+                if (!lastState._clockEstimateMode) {
+                    lastState._clockEstimateMode = true;
+                    lastState._clockEstimateStart = now;
+                }
             }
 
             if (lastState.lyrics && lastState.npMessage) {
@@ -178,11 +211,16 @@ function startPlaybackWatchdog() {
                 }
             }
 
-            const positionDelta = Math.abs(currentPos - (lastState.pos || 0));
-            const isPositionStuck = positionDelta < 1000;
+            if (lastState._clockEstimateMode) {
+                // Skippped
+                continue;
+            }
 
-            if (isPositionStuck && lastState.timestamp && (now - lastState.timestamp) > 45000) {
-                if (now - lastState.timestamp < 10000) continue;
+            const positionDelta = Math.abs(currentPos - (lastState.pos || 0));
+            const speed = lastState.nightcore ? 1.15 : lastState.vaporwave ? 0.85 : 1.0;
+            const isPositionStuck = positionDelta < 1000 * speed;
+
+            if (isPositionStuck && lastState.timestamp && (now - lastState.timestamp) > 45000 / speed) {
                 console.log(`[watchdog] player stuck in ${guildId} at ${currentPos}ms`);
                 await triggerStallRecovery(guildId, player, lastState);
             } else if (!isPositionStuck) {
@@ -207,6 +245,7 @@ async function triggerStallRecovery(guildId, player, lastState) {
     if (recentStalls.length >= 2) {
         console.log(`[watchdog] multiple stalls in ${guildId}, taking 60s recovery break`);
         lastState.isBreaking = true;
+        lastState.breakUntil = Date.now() + 60000;
 
         const voiceChannel = client.channels.cache.get(player.voiceChannelId);
         const savedQueue = player.queue.tracks.map(t => ({ ...t }));
@@ -240,6 +279,10 @@ async function triggerStallRecovery(guildId, player, lastState) {
                 });
                 await newPlayer.connect({ selfDeaf: true });
 
+                for (const name of ['nightcore', 'vaporwave', 'tremolo', 'vibrato', 'rotation', 'lowpass', 'echo', 'karaoke']) {
+                    lastState[name] = false;
+                }
+
                 if (currentTrack) {
                     newPlayer.queue.add(currentTrack);
                     await newPlayer.play({ position: pos });
@@ -249,6 +292,8 @@ async function triggerStallRecovery(guildId, player, lastState) {
                 }
 
                 lastState.isBreaking = false;
+                lastState._clockEstimateMode = false;
+                lastState._clockEstimateStart = 0;
 
                 if (vc?.permissionsFor(client.user)?.has(SET_VOICE_STATUS)) {
                     setVoiceChannelStatus(vc, '').catch(() => { });
@@ -271,6 +316,8 @@ async function triggerStallRecovery(guildId, player, lastState) {
             lastState.manualPos = 0;
             lastState.pos = 0;
             lastState.timestamp = Date.now();
+            lastState._clockEstimateMode = false;
+            lastState._clockEstimateStart = 0;
 
             player.seek(0).catch(err => {
                 console.log(`[watchdog] restart failed in ${guildId}: ${err.message}`);
