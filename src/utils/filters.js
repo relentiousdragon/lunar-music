@@ -3,52 +3,9 @@ const manager = require('../manager');
 const { playerStates } = require('../state');
 const { getFormattedDuration } = require('./format');
 //
-const FILTER_FIELDS = ['volume', 'equalizer', 'karaoke', 'timescale', 'tremolo', 'vibrato', 'rotation', 'distortion', 'channelMix', 'lowPass', 'echo', 'chorus', 'compressor', 'highpass', 'phaser', 'spatial', 'pluginFilters'];
-
-function isTimescale(filters, speed, pitch) {
-    const value = filters?.timescale;
-    return Boolean(value && Math.abs(value.speed - speed) < 0.001 && Math.abs(value.pitch - pitch) < 0.001);
-}
-
-function stateFromNodeFilters(filters = {}) {
-    return {
-        nightcore: isTimescale(filters, 1.15, 1.15),
-        vaporwave: isTimescale(filters, 0.85, 0.85),
-        tremolo: Boolean(filters.tremolo),
-        vibrato: Boolean(filters.vibrato),
-        rotation: Boolean(filters.rotation),
-        lowpass: Boolean(filters.lowPass),
-        echo: Boolean(filters.echo),
-        karaoke: Boolean(filters.karaoke)
-    };
-}
-
-function hydratePlayerFilters(player, filters = {}) {
-    for (const field of FILTER_FIELDS) player.filters[field] = undefined;
-    Object.assign(player.filters, filters);
-}
-
-function getMoonlinkFilters(player) {
-    return player?.filters?.toJSON?.() || {};
-}
-
-async function syncFilterState(player, fetchFromNode = true) {
-    if (!player) return null;
-    let filters = getMoonlinkFilters(player);
-    if (fetchFromNode && player.node?.rest?.getPlayer) {
-        try {
-            const remotePlayer = await player.node.rest.getPlayer(player.guildId);
-            if (remotePlayer?.filters && typeof remotePlayer.filters === 'object') {
-                filters = remotePlayer.filters;
-                hydratePlayerFilters(player, filters);
-            }
-        } catch (error) {
-            console.log(`[filters] node state sync failed for ${player.guildId}: ${error.message}`);
-        }
-    }
-    const state = playerStates.get(player.guildId) || {};
-    Object.assign(state, stateFromNodeFilters(filters));
-    playerStates.set(player.guildId, state);
+async function syncFilterState(player) {
+    const state = playerStates.get(player?.guildId) || {};
+    playerStates.set(player?.guildId, state);
     return state;
 }
 
@@ -105,5 +62,5 @@ async function updateNowPlayingEmbed(guildId) {
     }
 }
 //
-module.exports = { getActiveFiltersString, updateNowPlayingEmbed, syncFilterState, stateFromNodeFilters, getMoonlinkFilters };
+module.exports = { getActiveFiltersString, updateNowPlayingEmbed, syncFilterState };
 // contributors: @relentiousdragon
