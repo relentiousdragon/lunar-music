@@ -68,15 +68,15 @@ function isConfiguredNativeSource(source) {
         (source === 'dzsearch' && typeof manager.isDeezerEnabled === 'function' && manager.isDeezerEnabled());
 }
 
-function sourceCandidates(source) {
+function sourceCandidates(source, nodeLink) {
     const aliases = {
-        spotify: ['spotify', 'spsearch'], spsearch: ['spsearch', 'spotify'],
-        youtube: ['youtube', 'ytsearch'], ytsearch: ['ytsearch', 'youtube'],
-        youtubemusic: ['youtubemusic', 'ytmsearch', 'youtube'], ytmsearch: ['ytmsearch', 'youtubemusic', 'youtube'],
-        soundcloud: ['soundcloud', 'scsearch'], scsearch: ['scsearch', 'soundcloud'],
-        deezer: ['deezer', 'dzsearch'], dzsearch: ['dzsearch', 'deezer'],
-        applemusic: ['applemusic', 'amsearch'], amsearch: ['amsearch', 'applemusic'],
-        tidal: ['tidal', 'tdsearch'], tdsearch: ['tdsearch', 'tidal']
+        spotify: ['spsearch', 'spotify'], spsearch: ['spsearch', 'spotify'],
+        youtube: ['ytsearch', 'youtube'], ytsearch: ['ytsearch', 'youtube'],
+        youtubemusic: ['ytmsearch', 'youtubemusic', 'youtube'], ytmsearch: ['ytmsearch', 'youtubemusic', 'youtube'],
+        soundcloud: ['scsearch', 'soundcloud'], scsearch: ['scsearch', 'soundcloud'],
+        deezer: ['dzsearch', 'deezer'], dzsearch: ['dzsearch', 'deezer'],
+        applemusic: ['amsearch', 'applemusic'], amsearch: ['amsearch', 'applemusic'],
+        tidal: ['tdsearch', 'tidal'], tdsearch: ['tdsearch', 'tidal']
     }[source] || [source];
     const advertised = aliases.filter(candidate => capabilities.sources.has(candidate));
     if (advertised.length && !advertised.includes(source)) return [source, ...advertised];
@@ -97,7 +97,7 @@ function describeError(error) {
 
 async function loadTracksOnce(node, identifier) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
         const url = new URL('/v4/loadtracks', node.rest.url);
         url.searchParams.set('identifier', identifier);
@@ -112,7 +112,7 @@ async function loadTracksOnce(node, identifier) {
         }
         return await response.json();
     } catch (error) {
-        if (error.name === 'AbortError') throw new Error('search request timed out after 10s');
+        if (error.name === 'AbortError') throw new Error('search request timed out after 30s');
         throw error;
     } finally {
         clearTimeout(timeout);
@@ -124,16 +124,19 @@ async function searchOnce(query, requester, source) {
     const options = { query, requester: searchRequester };
     if (source) options.source = source;
     const node = manager.nodes.findNode();
-    const isDirectNodeSearch = Boolean(node && !node.isNodeLink && source && SEARCH_PREFIXES.has(source));
-    const identifier = isDirectNodeSearch ? `${SEARCH_PREFIXES.get(source)}:${query}` : undefined;
+    const isUrl = /^https?:\/\//i.test(query);
+    const useDirectLoad = isUrl || Boolean(node && !node.isNodeLink && source && SEARCH_PREFIXES.has(source));
+    const identifier = useDirectLoad
+        ? (isUrl ? query : `${SEARCH_PREFIXES.get(source)}:${query}`)
+        : undefined;
     logger.debug('search_transport', {
         source: source || 'direct',
-        transport: isDirectNodeSearch ? 'standard_lavalink_rest' : 'moonlink_manager',
+        transport: useDirectLoad ? 'direct_loadtracks' : 'moonlink_manager',
         node: node?.identifier,
         nodeType: node?.isNodeLink ? 'NodeLink' : 'Lavalink',
         identifier
     });
-    const searchPromise = isDirectNodeSearch
+    const searchPromise = useDirectLoad
         ? loadTracksOnce(node, identifier).then(response => new SearchResult(response, searchRequester, manager.options.search?.playlistLoadLimit))
         : manager.search(options);
     return Promise.race([
@@ -143,7 +146,16 @@ async function searchOnce(query, requester, source) {
 }
 
 async function searchWithRetry(player, query, requester, source = null) {
-    const sources = source ? [source] : (/^https?:\/\//i.test(query) ? [null] : getSourceOrder());
+    const isUrl = /^https?:\/\//i.test(query);
+    if (isUrl && !source) {
+        if (/open\.spotify\.com\/|spotify:track:|spotify:album:|spotify:playlist:/i.test(query)) source = 'spsearch';
+        else if (/deezer\.com\/|dzr\.page\.link\/|dzsearch:/i.test(query)) source = 'dzsearch';
+        else if (/music\.apple\.com\/|itunes\.apple\.com/i.test(query)) source = 'amsearch';
+        else if (/tidal\.com\/|tidal:track:|tidal:album:|tidal:playlist:/i.test(query)) source = 'tdsearch';
+        else if (/soundcloud\.com\/|scsearch:/i.test(query)) source = 'scsearch';
+        else if (/youtube\.com\/|youtu\.be\/|music\.youtube\.com\/|ytsearch:/i.test(query)) source = 'ytsearch';
+    }
+    const sources = (source && !isUrl) ? [source] : (isUrl ? [source || null] : getSourceOrder());
     let lastResult = { loadType: 'empty', tracks: [] };
     const attemptedFamilies = new Set();
     let hasReconnectableFailure = false;
