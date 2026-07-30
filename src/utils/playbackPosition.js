@@ -2,7 +2,7 @@ const MAX_NODE_TIMESTAMP_AGE_MS = 10000;
 const MAX_CLOCK_SKEW_MS = 120000;
 const DIRECT_NODE_REFRESH_MS = 30000;
 const ZERO_POSITION_MS = 1000;
-const RESET_GUARD_POSITION_MS = 30000;
+const RESET_GUARD_POSITION_MS = 45000;
 //
 function estimateNodePlaybackPosition(positionValue, timestampValue, durationValue, now = Date.now()) {
     const position = Number(positionValue);
@@ -28,7 +28,10 @@ function getDirectNodePlaybackPosition(player, state, now = Date.now()) {
     return estimateNodePlaybackPosition(remote?.position, remote?.timestamp, player?.current?.duration, now);
 }
 
-function canSynchronizeWatchdog(watchdogPosition, nodePosition) {
+function canSynchronizeWatchdog(watchdogPosition, nodePosition, clockAdvanced = false) {
+    if (clockAdvanced && nodePosition < watchdogPosition - 3000) {
+        return false;
+    }
     return !(nodePosition <= ZERO_POSITION_MS && watchdogPosition >= RESET_GUARD_POSITION_MS);
 }
 
