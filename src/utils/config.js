@@ -26,6 +26,14 @@ function validateEnvironment(env = process.env) {
     }
     if (!env.BOT_NAME?.trim()) warnings.push('BOT_NAME is not set, using Lunar');
     if (!env.BOT_PREFIXES?.trim()) warnings.push('BOT_PREFIXES is not set, using ln.,l.');
+    if (env.ACTIVITY_ENABLED === 'true') {
+        if (!env.ACTIVITY_DISCORD_CLIENT_ID?.trim() || !env.ACTIVITY_DISCORD_CLIENT_SECRET?.trim() || !env.ACTIVITY_REDIRECT_URI?.trim()) {
+            errors.push('Activity requires ACTIVITY_DISCORD_CLIENT_ID, ACTIVITY_DISCORD_CLIENT_SECRET, and ACTIVITY_REDIRECT_URI');
+        }
+        if (env.ACTIVITY_ALLOW_INSECURE_LOCAL !== 'true' && (!env.ACTIVITY_TLS_KEY_PATH?.trim() || !env.ACTIVITY_TLS_CERT_PATH?.trim())) {
+            errors.push('Activity requires ACTIVITY_TLS_KEY_PATH and ACTIVITY_TLS_CERT_PATH unless ACTIVITY_ALLOW_INSECURE_LOCAL=true');
+        }
+    }
     return { errors, warnings, valid: errors.length === 0 };
 }
 //
