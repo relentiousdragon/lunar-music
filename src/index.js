@@ -45,6 +45,9 @@ registerTrackStart();
 registerTrackEnd();
 registerTrackError();
 registerPlayerEvents();
+
+const { createActivityServer } = require('./activity/server');
+createActivityServer();
 //
 client.login(process.env.DISCORD_TOKEN);
 // contributors: @relentiousdragon
