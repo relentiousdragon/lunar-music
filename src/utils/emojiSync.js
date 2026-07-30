@@ -70,12 +70,6 @@ async function discordRequest(token, url, options = {}, attempt = 0) {
 
 async function syncApplicationEmojis({ token = process.env.DISCORD_TOKEN, applicationId = process.env.DISCORD_APPLICATION_ID } = {}) {
     const state = readState();
-    // Treat any stored entry as an explicit operator decision: never upload,
-    // reconcile, rename, or replace emojis once the registry has content.
-    if (Object.keys(state).length > 0) {
-        console.log(`[emoji-sync] registry contains ${Object.keys(state).length} entries; skipping upload`);
-        return state;
-    }
     if (!token) {
         console.warn('[emoji-sync] DISCORD_TOKEN missing; using emoji state without syncing');
         return state;
@@ -96,6 +90,7 @@ async function syncApplicationEmojis({ token = process.env.DISCORD_TOKEN, applic
             .filter(file => VALID_EXTENSIONS.has(path.extname(file).toLowerCase()))
             .sort();
 
+        let uploaded = 0;
         for (const file of files) {
             const name = emojiName(file);
             if (!name) continue;
@@ -120,11 +115,13 @@ async function syncApplicationEmojis({ token = process.env.DISCORD_TOKEN, applic
                 body: JSON.stringify({ name, image })
             });
             state[name] = { id: created.id, name: created.name, animated: Boolean(created.animated) };
+            uploaded++;
             console.log(`[emoji-sync] uploaded ${name} (${created.id})`);
         }
 
         writeState(state);
-        console.log(`[emoji-sync] synchronized ${Object.keys(state).length} application emojis`);
+        if (uploaded > 0) console.log(`[emoji-sync] uploaded ${uploaded} missing emojis; total: ${Object.keys(state).length}`);
+        else console.log(`[emoji-sync] all ${Object.keys(state).length} emojis up to date`);
     } catch (error) {
         console.error(`[emoji-sync] sync failed; bot startup will continue: ${error.message}`);
         try { writeState(state); } catch (writeError) { console.error(`[emoji-sync] state write failed: ${writeError.message}`); }
