@@ -34,13 +34,14 @@ function updateFromNode(node) {
 
 function resolveSourceName(platform) {
     const aliases = {
-        youtube: ['youtube', 'ytsearch'],
-        youtubemusic: ['youtubemusic', 'ytmsearch'],
-        spotify: ['spotify', 'spsearch'],
-        soundcloud: ['soundcloud', 'scsearch'],
-        deezer: ['deezer', 'dzsearch'],
-        applemusic: ['applemusic', 'amsearch'],
-        tidal: ['tidal', 'tdsearch']
+        youtube: ['ytsearch', 'youtube'],
+        youtubemusic: ['ytmsearch', 'youtubemusic'],
+        spotify: ['spsearch', 'spotify'],
+        soundcloud: ['scsearch', 'soundcloud'],
+        deezer: ['dzsearch', 'deezer'],
+        applemusic: ['amsearch', 'applemusic'],
+        tidal: ['tdsearch', 'tidal'],
+        monochrome: ['mcsearch', 'monochrome']
     }[platform] || [platform];
     return aliases.find(source => capabilities.sources.has(source)) || platform;
 }
@@ -75,7 +76,9 @@ function getAliases(source) {
         applemusic: ['applemusic', 'amsearch'],
         amsearch: ['applemusic', 'amsearch'],
         tidal: ['tidal', 'tdsearch'],
-        tdsearch: ['tidal', 'tdsearch']
+        tdsearch: ['tidal', 'tdsearch'],
+        monochrome: ['monochrome', 'mcsearch'],
+        mcsearch: ['monochrome', 'mcsearch']
     }[source] || [source];
 }
 //
