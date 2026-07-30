@@ -700,7 +700,7 @@ $('search-results').addEventListener('click', event => {
     state.searchSource = source;
     saveState('source', source);
     const labels = { youtube: 'YouTube', youtubemusic: 'YouTube Music', soundcloud: 'SoundCloud', spotify: 'Spotify', deezer: 'Deezer', applemusic: 'Apple Music', tidal: 'Tidal', monochrome: 'Monochrome' };
-    const icons = { spotify: 'emojis/spotify.webp', applemusic: 'emojis/apple_music.webp', deezer: 'emojis/deezer.webp', tidal: 'emojis/tidal.webp', soundcloud: 'emojis/soundcloud.webp', youtube: 'youtube.png', youtubemusic: 'youtube_music.png', monochrome: 'emojis/headphones.webp' };
+    const icons = { spotify: 'emojis/spotify.webp', applemusic: 'emojis/apple_music.webp', deezer: 'emojis/deezer.webp', tidal: 'emojis/tidal.webp', soundcloud: 'emojis/soundcloud.webp', youtube: 'emojis/youtube.png', youtubemusic: 'emojis/youtube_music.png', monochrome: 'emojis/headphones.webp' };
     $('source-label').textContent = labels[source] || source;
     $('source-icon').src = `/assets/${icons[source] || 'emojis/headphones.webp'}`;
     document.querySelectorAll('.source-option').forEach(item => {
