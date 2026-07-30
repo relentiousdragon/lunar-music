@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SETTINGS_PATH = path.join(process.cwd(), '.moonlink', 'guild-settings.json');
-const VALID_SOURCES = new Set(['youtube', 'youtubemusic', 'soundcloud', 'spotify', 'deezer', 'applemusic', 'tidal']);
+const VALID_SOURCES = new Set(['youtube', 'youtubemusic', 'soundcloud', 'spotify', 'deezer', 'applemusic', 'tidal', 'monochrome']);
 const DEFAULT_SOURCE_FALLBACK_ORDER = ['spotify', 'tidal', 'deezer', 'youtube'];
 let settings = {};
 
@@ -46,6 +46,7 @@ function getUsableDefaultSearchSource(guildId, fallbackSource = 'soundcloud') {
     }
     return null;
 }
+
 //
 module.exports = { VALID_SOURCES, DEFAULT_SOURCE_FALLBACK_ORDER, getDefaultSearchSource, getUsableDefaultSearchSource, setDefaultSearchSource, clearDefaultSearchSource };
 // contributors: @relentiousdragon
