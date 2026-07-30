@@ -9,7 +9,7 @@ async function execute(message) {
     }
     const nodes = [...manager.nodes.nodes.values()];
     const nodeLines = nodes.length
-        ? nodes.map(node => `• **${node.identifier}** — ${node.connected ? 'connected' : 'disconnected'} (${node.isNodeLink ? 'NodeLink' : 'Lavalink'})`).join('\n')
+        ? nodes.map(node => `• **${node.identifier}** - ${node.connected ? 'connected' : 'disconnected'} (${node.isNodeLink ? 'NodeLink' : 'Lavalink'})`).join('\n')
         : 'No configured nodes';
     const sources = capabilities.sources.size ? [...capabilities.sources].sort().join(', ') : 'not advertised';
     const unavailable = capabilities.unavailable.size
