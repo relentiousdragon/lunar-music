@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-viz-mode="auto" data-rpc-mode="full">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Lunar Music</title>
-  <link rel="stylesheet" href="/style.css?v=activity-11">
-  <link rel="stylesheet" href="/transitions.css?v=activity-11">
+  <link rel="stylesheet" href="/style.css?v=activity-14">
+  <link rel="stylesheet" href="/transitions.css?v=activity-14">
 </head>
 
 <body>
@@ -60,6 +60,27 @@
           <svg class="viz-icon viz-icon-wave" width="14" height="14" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M2 12c1.5-3 3-4.5 4.5-4.5S9 9 10.5 12 13 16.5 14.5 16.5 19 15 20.5 12 22 9 22 9" />
+          </svg>
+        </button>
+        <button class="panel-toggle rpc-mode-btn" id="rpc-mode" aria-label="Rich Presence mode">
+          <svg class="rpc-icon rpc-icon-full" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.9 19.1C1.9 16.1 1.9 11.3 4.9 8.3" />
+            <path d="M7.8 16.2c-1.6-1.6-1.6-4.1 0-5.7" />
+            <circle cx="12" cy="12" r="2" />
+            <path d="M16.2 10.5c1.6 1.6 1.6 4.1 0 5.7" />
+            <path d="M19.1 7.6c3 3 3 7.8 0 10.8" />
+          </svg>
+          <svg class="rpc-icon rpc-icon-limited" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7.8 16.2c-1.6-1.6-1.6-4.1 0-5.7" />
+            <circle cx="12" cy="12" r="2" />
+            <path d="M16.2 10.5c1.6 1.6 1.6 4.1 0 5.7" />
+          </svg>
+          <svg class="rpc-icon rpc-icon-off" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="2" y1="2" x2="22" y2="22" />
+            <circle cx="12" cy="12" r="2" />
           </svg>
         </button>
       </div>
@@ -158,7 +179,7 @@
     </div>
   </div>
   <div id="toast" class="toast"></div>
-  <script type="module" src="/app.js?v=activity-12"></script>
+  <script type="module" src="/app.js?v=activity-19"></script>
 </body>
 
 </html>
