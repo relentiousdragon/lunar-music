@@ -26,6 +26,8 @@ async function executeSkip(message, args) {
         });
     }
 
+    if (skipPlayer._isNavigating) return;
+    skipPlayer._isNavigating = true;
     try {
         if (skipPlayer.queue.tracks.length === 0) {
             skipPlayer.queue.clear();
@@ -43,6 +45,8 @@ async function executeSkip(message, args) {
         message.channel.send({
             embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Error`, 'Could not skip track: ' + error.message, '#FF0000')]
         });
+    } finally {
+        skipPlayer._isNavigating = false;
     }
 }
 
@@ -98,6 +102,8 @@ async function executeBack(message, args) {
         });
     }
 
+    if (backPlayer._isNavigating) return;
+    backPlayer._isNavigating = true;
     try {
         await backPlayer.back();
         const prevTrack = backPlayer.current;
@@ -112,6 +118,8 @@ async function executeBack(message, args) {
         message.channel.send({
             embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Error`, 'Could not go back: ' + error.message, '#FF0000')]
         });
+    } finally {
+        backPlayer._isNavigating = false;
     }
 }
 //
