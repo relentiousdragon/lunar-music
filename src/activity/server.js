@@ -273,7 +273,8 @@ async function exchangeCode(code, config) {
         fetch('https://discord.com/api/users/@me/guilds', { headers })
     ]);
     if (!userResponse.ok || !guildResponse.ok) throw new Error('Discord identity verification failed');
-    return { user: await userResponse.json(), guilds: await guildResponse.json() };
+    const scopes = String(token.scope || '').split(/\s+/).filter(Boolean);
+    return { user: await userResponse.json(), guilds: await guildResponse.json(), scopes, accessToken: token.access_token };
 }
 
 async function requireVoiceAccess(session) {
@@ -382,13 +383,24 @@ function createActivityServer() {
                     const guild = client.guilds.cache.get(message.guildId);
                     if (!guild) throw new Error('Guild is unavailable');
                     const member = await guild.members.fetch(identity.user.id);
-                    if (!member.voice?.channelId || member.voice.channelId !== message.channelId) throw new Error('Launch Lunar from the voice channel you are currently in');
+                    const getBotName = () => process.env.BOT_NAME || 'Lunar';
+                    if (!member.voice?.channelId || member.voice.channelId !== message.channelId) throw new Error(`Launch ${getBotName()} from the voice channel you are currently in`);
                     const player = manager.players.get(message.guildId);
                     if (player && player.voiceChannelId !== member.voice.channelId) throw new Error('Join the bot’s voice channel before opening this Activity');
                     session.user = identity.user;
                     session.guildId = message.guildId;
                     session.channelId = message.channelId;
-                    sendJson(ws, { type: 'ready', user: { id: identity.user.id, username: identity.user.global_name || identity.user.username }, search: getActivitySources(session.guildId), state: getSnapshot(session.guildId) });
+                    session.scopes = identity.scopes || [];
+                    session.accessToken = identity.accessToken;
+                    sendJson(ws, { type: 'ready', user: { id: identity.user.id, username: identity.user.global_name || identity.user.username }, scopes: session.scopes, accessToken: session.accessToken, search: getActivitySources(session.guildId), state: getSnapshot(session.guildId), rateAggro: process.env.RATE_RESPECT_AGGRO === 'true' });
+                    return;
+                } else if (message.type === 'reauth') {
+                    if (!message.code) throw new Error('Incomplete reauthorization request');
+                    const identity = await exchangeCode(message.code, config);
+                    session.user = identity.user;
+                    session.scopes = identity.scopes || [];
+                    session.accessToken = identity.accessToken;
+                    sendJson(ws, { type: 'reauth-ok', scopes: session.scopes, accessToken: session.accessToken });
                     return;
                 }
                 if (!session.user) throw new Error('Authenticate before using the Activity');
@@ -480,14 +492,26 @@ function createActivityServer() {
                     if (!player.paused) throw new Error('Not paused');
                     player.resume();
                 } else if (message.type === 'skip') {
-                    if (player.queue.tracks.length === 0) { player.queue.clear(); player.stop(); }
-                    else await player.skip();
+                    if (player._isNavigating) return;
+                    player._isNavigating = true;
+                    try {
+                        if (player.queue.tracks.length === 0) { player.queue.clear(); player.stop(); }
+                        else await player.skip();
+                    } finally {
+                        player._isNavigating = false;
+                    }
                 } else if (message.type === 'back') {
-                    const pos = player.position || 0;
-                    if (pos > 10000 || !player.previous || player.previous.length === 0) {
-                        await player.seek(0);
-                    } else {
-                        await player.back();
+                    if (player._isNavigating) return;
+                    player._isNavigating = true;
+                    try {
+                        const pos = player.position || 0;
+                        if (pos > 10000 || !player.previous || player.previous.length === 0) {
+                            await player.seek(0);
+                        } else {
+                            await player.back();
+                        }
+                    } finally {
+                        player._isNavigating = false;
                     }
                 } else if (message.type === 'toggle-filter') {
                     const filterName = String(message.filter || '').toLowerCase();
@@ -497,7 +521,7 @@ function createActivityServer() {
                     state[filterName] = !state[filterName];
                     if (filterName === 'nightcore' && state.nightcore && state.vaporwave) state.vaporwave = false;
                     if (filterName === 'vaporwave' && state.vaporwave && state.nightcore) state.nightcore = false;
-                    state._filterCooldownUntil = Date.now() + 1500;
+                    state._filterCooldownUntil = Date.now() + (process.env.RATE_RESPECT_AGGRO === 'true' ? 4000 : 1500);
                     playerStates.set(session.guildId, state);
                     if (state[filterName]) def.apply(player); else def.clear(player);
                     await player.filters.apply();
@@ -566,7 +590,8 @@ function createActivityServer() {
             if (session.guildId !== newState.guild.id || session.user?.id !== newState.id) continue;
             const expectedVoiceChannelId = manager.players.get(session.guildId)?.voiceChannelId || session.channelId;
             if (newState.channelId === expectedVoiceChannelId) continue;
-            sendJson(session.ws, { type: 'error', message: 'You left the Activity voice channel. Reopen Lunar from your current voice channel.' });
+            const getBotName = () => process.env.BOT_NAME || 'Lunar';
+            sendJson(session.ws, { type: 'error', message: `You left the Activity voice channel. Reopen ${getBotName()} from your current voice channel.` });
             session.ws.close(4003, 'Voice channel changed');
         }
     });
