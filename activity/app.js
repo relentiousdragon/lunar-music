@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = { snapshot: null, socket: null, searchTimer: null, searchResults: [], dragIndex: null, trackKey: null, queueKey: null, lyricsKey: null, relatedKey: null, activeLyric: -1, cooldowns: {}, openPanel: null };
+const state = { snapshot: null, socket: null, searchTimer: null, searchResults: [], dragIndex: null, trackKey: null, queueKey: null, lyricsKey: null, relatedKey: null, activeLyric: -1, cooldowns: {}, openPanel: null, searchDebounce: 350, filterCooldown: 1500, buttonCooldown: 2000 };
 const previewMode = new URLSearchParams(location.search).has('preview');
 const format = ms => `${String(Math.floor(Math.max(0, ms) / 60000)).padStart(2, '0')}:${String(Math.floor(Math.max(0, ms) / 1000) % 60).padStart(2, '0')}`;
 const EFFECTS = ['nightcore', 'vaporwave', 'tremolo', 'vibrato', 'rotation', 'lowpass', 'echo', 'karaoke'];
@@ -27,7 +27,7 @@ function saveState(key, value) { try { localStorage.setItem(STORAGE_PREFIX + key
 //
 const COOLDOWN_MS = 2000;
 function setCooldown(action) {
-  state.cooldowns[action] = Date.now() + COOLDOWN_MS;
+  state.cooldowns[action] = Date.now() + state.buttonCooldown;
   updateControlStates();
   const btn = $(`btn-${action}`) || document.querySelector(`[data-effect="${action}"]`);
   if (btn) { btn.classList.add('cooldown'); }
@@ -417,6 +417,7 @@ function render() {
     if (lyricsAutoScroll) nextLyric?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
   state.activeLyric = active;
+  updateRPC();
 }
 
 function escapeHtml(value = '') { const div = document.createElement('div'); div.textContent = value; return div.innerHTML; }
@@ -480,10 +481,40 @@ function connectSocket(auth) {
       $('voice-screen').classList.remove('visible');
       $('shell').style.display = '';
       state.snapshot = message.state;
+      if (message.user) state.currentUser = message.user;
+      if (Array.isArray(message.scopes)) state.scopes = message.scopes;
+      if (message.accessToken && state.sdk) {
+        state.sdk.commands.authenticate({ access_token: message.accessToken }).then(auth => {
+          state.auth = auth;
+          hasRpcScope = true;
+          updateRPC();
+        }).catch(() => {});
+      }
       setSearchSources(message.search);
       setConnection('CONNECTED', 'ready');
       restorePanelStates();
+      if (message.rateAggro) {
+        state.searchDebounce = 1200;
+        state.filterCooldown = 4000;
+        state.buttonCooldown = 5000;
+      }
       render();
+    } else if (message.type === 'reauth-ok') {
+      if (Array.isArray(message.scopes)) state.scopes = message.scopes;
+      if (message.accessToken && state.sdk) {
+        state.sdk.commands.authenticate({ access_token: message.accessToken }).then(auth => {
+          state.auth = auth;
+          hasRpcScope = true;
+          toast('Rich Presence permission granted');
+          applyRpcMode(state.pendingRpcMode || 'full');
+        }).catch(() => {
+          applyRpcMode('off');
+        });
+      } else {
+        hasRpcScope = true;
+        toast('Rich Presence permission granted');
+        applyRpcMode(state.pendingRpcMode || 'full');
+      }
     } else if (message.type === 'state') {
       state.snapshot = message;
       render();
@@ -506,12 +537,15 @@ async function connectActivity() {
     setConnection('CONNECTING TO DISCORD…');
     const { DiscordSDK } = await import('/activity/sdk/index.mjs');
     const config = await fetch('/config').then(response => response.json());
+    state.config = config;
     if (config.botAvatar) $('brand-avatar').src = config.botAvatar;
     if (config.botName) {
       const cleaned = config.botName.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
       $('brand-name').textContent = cleaned;
+      document.title = `${config.botName} Music`;
     }
     const sdk = new DiscordSDK(config.clientId);
+    state.sdk = sdk;
     await withTimeout(sdk.ready(), 10000, 'Discord Activity handshake timed out.');
     const applyLayoutMode = update => {
       const isPip = update?.layout_mode === 1 || update?.is_pip === true;
@@ -521,8 +555,8 @@ async function connectActivity() {
     sdk.subscribe('ACTIVITY_LAYOUT_MODE_UPDATE', applyLayoutMode).catch(() => { });
     sdk.subscribe('ACTIVITY_PIP_MODE_UPDATE', applyLayoutMode).catch(() => { });
     setConnection('AUTHORIZING…');
-    const { code } = await withTimeout(sdk.commands.authorize({ client_id: config.clientId, response_type: 'code', prompt: 'none', scope: ['identify', 'guilds'] }), 10000, 'Discord authorization timed out.');
-    if (!sdk.guildId || !sdk.channelId) throw new Error('Launch Lunar Activity from a guild voice channel.');
+    const { code } = await withTimeout(sdk.commands.authorize({ client_id: config.clientId, response_type: 'code', prompt: 'none', scope: ['identify', 'guilds', 'rpc.activities.write'] }), 10000, 'Discord authorization timed out.');
+    if (!sdk.guildId || !sdk.channelId) throw new Error(`Launch ${config.botName || 'Lunar'} Activity from a guild voice channel.`);
     connectSocket({ code, guildId: sdk.guildId, channelId: sdk.channelId });
   } catch (error) {
     const msg = error.message || '';
@@ -532,8 +566,9 @@ async function connectActivity() {
       const screen = $('voice-screen');
       if (screen) {
         if (/different/i.test(msg) || /bot['’]s voice channel/i.test(msg)) {
-          $('voice-screen-title').textContent = 'Lunar is in Another Channel';
-          $('voice-screen-message').textContent = 'Lunar is playing music in a different voice channel. Join that channel or use /stop to move it.';
+          const bName = state.config?.botName || 'Lunar';
+          $('voice-screen-title').textContent = `${bName} is in Another Channel`;
+          $('voice-screen-message').textContent = `${bName} is playing music in a different voice channel. Join that channel or use /stop to move it.`;
         } else {
           $('voice-screen-title').textContent = 'Voice Channel Required';
           $('voice-screen-message').textContent = 'Open this Activity from a voice channel to control the music.';
@@ -645,7 +680,7 @@ $('search').addEventListener('input', event => {
     return;
   }
   renderSearch(null);
-  state.searchTimer = setTimeout(() => send({ type: 'search', query, source: state.searchSource }), 350);
+  state.searchTimer = setTimeout(() => send({ type: 'search', query, source: state.searchSource }), state.searchDebounce);
 });
 
 $('search').addEventListener('keydown', event => {
@@ -819,6 +854,181 @@ vizBtn.addEventListener('click', () => {
   const idx = VIZ_MODES.indexOf(vizMode);
   applyVizMode(VIZ_MODES[(idx + 1) % VIZ_MODES.length]);
 });
+
+const JAM_MESSAGES = [
+  'Listening to some jams',
+  'Vibing to the queue',
+  'Enjoying the tunes',
+  'Chilling with music',
+  'Listening with the squad',
+  'Jumping to the beat',
+  'Grooving along',
+  'Jamming in voice',
+  'Listening to group queue',
+  'Riding the soundwaves'
+];
+
+const RPC_MODES = ['full', 'limited', 'off'];
+let rpcMode = loadState('rpc-mode', 'full');
+let currentRpcTrackKey = null;
+let currentJamMessage = JAM_MESSAGES[0];
+
+const rpcBtn = $('rpc-mode');
+function applyRpcMode(mode) {
+  rpcMode = mode;
+  saveState('rpc-mode', mode);
+  document.documentElement.setAttribute('data-rpc-mode', mode);
+  if (rpcBtn) {
+    rpcBtn.setAttribute('data-rpc-mode', mode);
+    rpcBtn.title = mode === 'full' ? 'RPC: Full' : mode === 'limited' ? 'RPC: Limited (Mine Only)' : 'RPC: Off';
+    rpcBtn.setAttribute('aria-label', `Rich Presence: ${mode}`);
+  }
+  updateRPC();
+}
+applyRpcMode(rpcMode);
+
+let hasRpcScope = true;
+
+async function reauthorizeRPC() {
+  if (!state.sdk || !state.config?.clientId) return false;
+  try {
+    toast('Opening Discord permission prompt…');
+    const res = await state.sdk.commands.authorize({
+      client_id: state.config.clientId,
+      response_type: 'code',
+      prompt: 'consent',
+      scope: ['identify', 'guilds', 'rpc.activities.write']
+    });
+    if (res?.code) {
+      hasRpcScope = true;
+      try { send({ type: 'reauth', code: res.code, guildId: state.sdk.guildId, channelId: state.sdk.channelId }); } catch {}
+      return true;
+    }
+  } catch (error) {
+    toast(error.message || 'Permission prompt declined');
+  }
+  return false;
+}
+
+if (rpcBtn) {
+  rpcBtn.addEventListener('click', async () => {
+    const idx = RPC_MODES.indexOf(rpcMode);
+    const nextMode = RPC_MODES[(idx + 1) % RPC_MODES.length];
+    if (nextMode !== 'off' && hasRpcScope === false) {
+      state.pendingRpcMode = nextMode;
+      const success = await reauthorizeRPC();
+      if (!success) return;
+    }
+    applyRpcMode(nextMode);
+  });
+}
+
+function resolveFullImageUrl(url) {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/')) return `${window.location.origin}${url}`;
+  return url;
+}
+
+function isStandardYouTubeTrack(track) {
+  if (!track) return false;
+  const source = String(track.sourceName || '').toLowerCase();
+  const uri = String(track.uri || track.url || '').toLowerCase();
+  const isYtm = source === 'youtubemusic' || source === 'ytmsearch' || uri.includes('music.youtube.com');
+  if (isYtm) return false;
+  return source === 'youtube' || source === 'ytsearch' || uri.includes('youtube.com') || uri.includes('youtu.be');
+}
+
+function updateRPC() {
+  if (!state.sdk) return;
+  if (rpcMode === 'off') {
+    if (currentRpcTrackKey !== 'off') {
+      currentRpcTrackKey = 'off';
+      state.sdk.commands.setActivity({ activity: null }).catch(() => {});
+    }
+    return;
+  }
+
+  const player = state.snapshot?.player;
+  const current = player?.current;
+  if (!current || !player?.playing || player?.paused || player?.onBreak || isStandardYouTubeTrack(current)) {
+    if (currentRpcTrackKey !== 'idle') {
+      currentRpcTrackKey = 'idle';
+      state.sdk.commands.setActivity({ activity: null }).catch(() => {});
+    }
+    return;
+  }
+
+  const isMySong = Boolean(
+    current.requester?.id &&
+    state.currentUser?.id &&
+    String(current.requester.id) === String(state.currentUser.id)
+  );
+
+  const trackKey = `${current.encoded || ''}:${current.uri || ''}:${current.title}:${current.author}`;
+  if (trackKey !== currentRpcTrackKey) {
+    currentRpcTrackKey = trackKey;
+    const randomIndex = Math.floor(Math.random() * JAM_MESSAGES.length);
+    currentJamMessage = JAM_MESSAGES[randomIndex];
+  }
+
+  const botName = state.config?.botName || 'Lunar';
+  const botBranding = `${botName} Music`;
+  const botAvatar = state.config?.botAvatar ? resolveFullImageUrl(state.config.botAvatar) : undefined;
+  const largeArt = resolveFullImageUrl(current.artworkUrl) || botAvatar;
+  const now = Date.now();
+  const position = Number(player.position) || 0;
+  const duration = Number(current.duration) || 0;
+
+  const handleRpcError = err => {
+    if (err && /scope|permission|denied|unauthorized|4001/i.test(err.message || String(err))) {
+      hasRpcScope = false;
+      applyRpcMode('off');
+    }
+  };
+
+  if (rpcMode === 'full' || (rpcMode === 'limited' && isMySong)) {
+    const titleText = String(current.title || 'Unknown Track').slice(0, 128);
+    const authorText = current.author ? String(current.author).slice(0, 60) : '';
+    const stateText = authorText ? `Listening to ${authorText}`.slice(0, 128) : 'Listening to music';
+    const timestamps = duration > 0 ? {
+      start: Math.round(now - position),
+      end: Math.round(now + Math.max(0, duration - position))
+    } : {
+      start: Math.round(now - position)
+    };
+
+    state.sdk.commands.setActivity({
+      activity: {
+        details: titleText,
+        state: stateText,
+        assets: {
+          large_image: largeArt,
+          large_text: titleText,
+          small_image: botAvatar,
+          small_text: botBranding
+        },
+        timestamps
+      }
+    }).then(() => { hasRpcScope = true; }).catch(handleRpcError);
+  } else {
+    state.sdk.commands.setActivity({
+      activity: {
+        details: currentJamMessage,
+        state: botBranding,
+        assets: {
+          large_image: botAvatar,
+          large_text: botBranding,
+          small_image: botAvatar,
+          small_text: botBranding
+        },
+        timestamps: {
+          start: Math.round(now - position)
+        }
+      }
+    }).then(() => { hasRpcScope = true; }).catch(handleRpcError);
+  }
+}
 function lerp(a, b, t) { return a + (b - a) * Math.min(1, Math.max(0, t)); }
 function lerpColor(c1, c2, t) {
   return { r: Math.round(lerp(c1.r, c2.r, t)), g: Math.round(lerp(c1.g, c2.g, t)), b: Math.round(lerp(c1.b, c2.b, t)) };
