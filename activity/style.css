@@ -222,6 +222,30 @@ header {
   display: none;
 }
 
+.rpc-mode-btn {
+  position: relative;
+}
+
+.rpc-icon {
+  display: none !important;
+}
+
+[data-rpc-mode="full"] .rpc-icon-full,
+#rpc-mode[data-rpc-mode="full"] .rpc-icon-full,
+html:not([data-rpc-mode]) .rpc-icon-full {
+  display: block !important;
+}
+
+[data-rpc-mode="limited"] .rpc-icon-limited,
+#rpc-mode[data-rpc-mode="limited"] .rpc-icon-limited {
+  display: block !important;
+}
+
+[data-rpc-mode="off"] .rpc-icon-off,
+#rpc-mode[data-rpc-mode="off"] .rpc-icon-off {
+  display: block !important;
+}
+
 .connection {
   margin-left: auto;
   font-size: 9px;
