@@ -11,6 +11,8 @@ a discord music bot that plays from youtube, spotify, soundcloud, deezer, apple 
 
 ![now playing](assets/now_playing.png)
 
+![Rich Presence](assets/rich_presence.png)
+
 uses **NodeLink** for audio streaming - you have to host or supply the bot with a node yourself.
 
 > Bot's recommended for small/private instances (around **10 active servers**). If you plan to scale beyond that, you'll need to modify the source code yourself to handle sharding and larger scale workloads.
