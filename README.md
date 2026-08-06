@@ -13,7 +13,7 @@ a discord music bot that plays from youtube, spotify, soundcloud, deezer, apple 
 
 ![Rich Presence](assets/rich_presence.png)
 
-uses **NodeLink** for audio streaming - you have to host or supply the bot with a node yourself.
+uses **NodeLink/Lavalink** for audio streaming - you have to host or supply the bot with a node yourself.
 
 > Bot's recommended for small/private instances (around **10 active servers**). If you plan to scale beyond that, you'll need to modify the source code yourself to handle sharding and larger scale workloads.
 
@@ -203,7 +203,7 @@ use these with the `play` command to search on a specific platform:
 
 ```
 lunar-music/
-├── assets/                   <- screenshots (now_playing, session_summary, vc_status)
+├── assets/                   <- image assets
 ├── bot.js                    <- process supervisor (crash detection, restarts & logging)
 ├── src/
 │   ├── index.js              <- bot main entry point
