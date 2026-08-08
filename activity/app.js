@@ -123,14 +123,25 @@ function setSearchSources(search) {
 
 const withTimeout = (promise, ms, message) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
 //
+function getPlaybackPosition() {
+  const player = state.snapshot?.player;
+  if (!player) return 0;
+  const now = Date.now();
+  const speed = player.filters?.nightcore ? 1.15 : player.filters?.vaporwave ? 0.85 : 1.0;
+  const pos = (player.position || 0) + (player.playing && !player.paused ? Math.max(0, now - (player.updatedAt || now)) * speed : 0);
+  return Math.max(0, Math.floor(pos));
+}
+
 function updateControlStates() {
   const player = state.snapshot?.player;
   const hasCurrent = Boolean(player?.current);
   const canPrev = Boolean(player?.hasPrevious);
   const canNext = Boolean(player?.queueLength > 0);
   const canPlay = hasCurrent;
+  const position = getPlaybackPosition();
+  const canBack = hasCurrent && (position > 10000 || canPrev);
 
-  $('btn-back').disabled = !hasCurrent || isOnCooldown('back');
+  $('btn-back').disabled = !canBack || isOnCooldown('back');
   $('btn-skip').disabled = !canNext || isOnCooldown('skip');
 
   const playBtn = $('btn-play');
@@ -434,6 +445,17 @@ function showTopLoading() {
 function renderSearch(results, label) {
   const target = $('search-results');
   const wrap = document.querySelector('.search-wrap');
+  const query = $('search')?.value.trim() || '';
+
+  if (label !== 'Trending' && !query && results !== null) {
+    state.searching = false;
+    if (wrap) wrap.classList.remove('searching');
+    if (target) {
+      target.innerHTML = '';
+      target.classList.remove('open');
+    }
+    return;
+  }
   if (results === null) {
     state.searching = true;
     wrap.classList.add('searching');
@@ -727,7 +749,12 @@ document.addEventListener('click', event => {
 $('search-results').addEventListener('click', event => {
   const row = event.target.closest('[data-result]');
   if (row) {
-    send({ type: 'enqueue', index: Number(row.dataset.result) }); $('search').value = ''; renderSearch([]); return;
+    clearTimeout(state.searchTimer);
+    send({ type: 'enqueue', index: Number(row.dataset.result) });
+    $('search').value = '';
+    $('search').blur();
+    renderSearch([]);
+    return;
   }
   const tryBtn = event.target.closest('[data-try-source]');
   if (tryBtn) {
@@ -815,7 +842,12 @@ $('btn-skip').addEventListener('click', event => {
 });
 
 $('btn-back').addEventListener('click', event => {
-  if (isOnCooldown('back') || !state.snapshot?.player?.hasPrevious) return;
+  const player = state.snapshot?.player;
+  if (isOnCooldown('back') || !player?.current) return;
+  const position = getPlaybackPosition();
+  const canPrev = Boolean(player.hasPrevious);
+  if (position <= 10000 && !canPrev) return;
+
   addRipple($('btn-back'), event);
   setCooldown('back');
   send({ type: 'back' });
@@ -1130,6 +1162,7 @@ function draw(time) {
 
   const outAlpha = transitioning ? 1 - easeInOut(transitionProgress) : 1;
   modeFns[currentMode](w, h, pos, energy, mix1, shade3, outAlpha, player?.current?.bpm || null);
+  updateControlStates();
 }
 requestAnimationFrame(draw);
 //
