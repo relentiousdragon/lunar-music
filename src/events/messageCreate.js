@@ -51,6 +51,12 @@ register('sr', system);
 
 const credits = require('../commands/credits');
 register('credits', credits);
+
+const node = require('../commands/node');
+register('node', node);
+
+const source = require('../commands/source');
+register('source', source);
 const { checkRateLimit } = require('../utils/rateLimit');
 //
 function getPrefixes() {

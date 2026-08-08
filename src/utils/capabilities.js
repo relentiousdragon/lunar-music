@@ -16,6 +16,8 @@ function updateFromNode(node) {
         .filter(Boolean);
     const fromInfo = Array.isArray(node?.info?.sourceManagers) ? node.info.sourceManagers : [];
     capabilities.sources = new Set(advertised.length ? advertised : fromInfo);
+
+    capabilities.unavailable.clear();
     info('node_capabilities', {
         node: node?.identifier,
         nodeType: capabilities.nodeType,
@@ -32,11 +34,14 @@ function updateFromNode(node) {
 
 function resolveSourceName(platform) {
     const aliases = {
-        spotify: ['spotify', 'spsearch'],
-        soundcloud: ['soundcloud', 'scsearch'],
-        deezer: ['deezer', 'dzsearch'],
-        applemusic: ['applemusic', 'amsearch'],
-        tidal: ['tidal', 'tdsearch']
+        youtube: ['ytsearch', 'youtube'],
+        youtubemusic: ['ytmsearch', 'youtubemusic'],
+        spotify: ['spsearch', 'spotify'],
+        soundcloud: ['scsearch', 'soundcloud'],
+        deezer: ['dzsearch', 'deezer'],
+        applemusic: ['amsearch', 'applemusic'],
+        tidal: ['tdsearch', 'tidal'],
+        monochrome: ['mcsearch', 'monochrome']
     }[platform] || [platform];
     return aliases.find(source => capabilities.sources.has(source)) || platform;
 }
@@ -49,11 +54,32 @@ function markUnavailable(source, reason) {
 function supports(source) {
     if (capabilities.nodeType === 'unknown') return true;
     if (capabilities.sources.size === 0) return !capabilities.unavailable.has(source);
-    return capabilities.sources.has(source) && !capabilities.unavailable.has(source);
+    return getAliases(source).some(alias => capabilities.sources.has(alias)) && !capabilities.unavailable.has(source);
 }
 
 function getUnavailableReason(source) {
     return capabilities.unavailable.get(source);
+}
+
+function getAliases(source) {
+    return {
+        youtube: ['youtube', 'ytsearch'],
+        ytsearch: ['youtube', 'ytsearch'],
+        youtubemusic: ['youtubemusic', 'ytmsearch', 'youtube'],
+        ytmsearch: ['youtubemusic', 'ytmsearch', 'youtube'],
+        spotify: ['spotify', 'spsearch'],
+        spsearch: ['spotify', 'spsearch'],
+        soundcloud: ['soundcloud', 'scsearch'],
+        scsearch: ['soundcloud', 'scsearch'],
+        deezer: ['deezer', 'dzsearch'],
+        dzsearch: ['deezer', 'dzsearch'],
+        applemusic: ['applemusic', 'amsearch'],
+        amsearch: ['applemusic', 'amsearch'],
+        tidal: ['tidal', 'tdsearch'],
+        tdsearch: ['tidal', 'tdsearch'],
+        monochrome: ['monochrome', 'mcsearch'],
+        mcsearch: ['monochrome', 'mcsearch']
+    }[source] || [source];
 }
 //
 module.exports = { capabilities, updateFromNode, resolveSourceName, markUnavailable, supports, getUnavailableReason };

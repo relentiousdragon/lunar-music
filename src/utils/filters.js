@@ -3,6 +3,12 @@ const manager = require('../manager');
 const { playerStates } = require('../state');
 const { getFormattedDuration } = require('./format');
 //
+async function syncFilterState(player) {
+    const state = playerStates.get(player?.guildId) || {};
+    playerStates.set(player?.guildId, state);
+    return state;
+}
+
 function getActiveFiltersString(state) {
     if (!state) return '';
     const active = [];
@@ -56,5 +62,5 @@ async function updateNowPlayingEmbed(guildId) {
     }
 }
 //
-module.exports = { getActiveFiltersString, updateNowPlayingEmbed };
+module.exports = { getActiveFiltersString, updateNowPlayingEmbed, syncFilterState };
 // contributors: @relentiousdragon

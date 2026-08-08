@@ -90,7 +90,7 @@ const manager = new Manager({
         clientName: `${getBotName()}/${packageInfo.version}`,
         node: { autoMovePlayers: true },
         search: { defaultPlatform: 'soundcloud' },
-        sources: { disabledSources: ['youtube', 'youtubemusic'] },
+        sources: { disabledSources: [] },
         spotify: {
             enabled: Boolean((process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) || process.env.SPOTIFY_ACCESS_TOKEN),
             clientId: process.env.SPOTIFY_CLIENT_ID,
@@ -118,6 +118,14 @@ manager.on('nodeConnected', (node) => {
         return;
     }
     updateFromNode(node);
+    const now = Date.now();
+    if (!manager._lastSlashRegister || now - manager._lastSlashRegister > 30000) {
+        setTimeout(() => {
+            const { registerSlashCommands } = require('./events/interactionCreate');
+            registerSlashCommands().catch(error => logger.warn('slash_source_refresh_failed', { error: error.message }));
+            manager._lastSlashRegister = Date.now();
+        }, 0);
+    }
     logger.info('node_connected', { node: node.identifier, nodeLink: Boolean(node.isNodeLink) });
 });
 
@@ -129,7 +137,7 @@ manager.on('nodeDisconnect', (node, code, reason) => {
         logger.warn('node_reconnect_cooldown', {
             node: node.identifier,
             delayMinutes: CONNECTION_RATE_LIMIT_COOLDOWN_MS / 60000,
-            message: 'Lavalink rate-limited this bot; reconnect is delayed to avoid extending the lockout.'
+            message: 'The node rate-limited this bot, reconnect is delayed to avoid extending the lockout.'
         });
     }
 });

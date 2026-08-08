@@ -1,19 +1,21 @@
 {
   "name": "lunar-music",
-  "version": "1.6.7",
+  "version": "1.7.3",
   "description": "a discord music bot built with discord.js and moonlink.js",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
     "dev": "node --watch bot.js",
-    "test": "node --test test/**/*.test.js"
+    "activity:preview": "node activity/preview-server.js"
   },
   "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
     "@discordjs/voice": "^0.18.0",
     "discord.js": "^14.18.0",
     "dotenv": "^16.5.0",
     "moonlink.js": "^5.2.0",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.3",
+    "ws": "^8.18.0"
   },
   "allowScripts": {
     "sharp": true

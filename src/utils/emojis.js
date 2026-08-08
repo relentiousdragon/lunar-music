@@ -17,9 +17,12 @@ const LEGACY_EMOJIS = {
     reply_cont: '<:utility_purple_right:1353398788047372389>',
     reply: '<:utility_purple_right:1353398788047372389>',
     headphones: '<:sound:1355490199660003430>',
+    youtube: '<:youtube:0>',
+    youtube_music: '<:youtube_music:0>',
     deezer: '<:icon_deezer:1354447426479587430>',
     checkmark: '<:utility_check_mark:1352305451693379727>',
     apple_music: '<:icon_apple_music:1469626775704440842>',
+    monochrome: '<:sound:1355490199660003430>',
 };
 const emojiStatePath = path.join(__dirname, 'emojis.json');
 let emojiState = {};
@@ -38,11 +41,14 @@ for (const [name, value] of Object.entries(LEGACY_EMOJIS)) {
     if (!EMOJIS[name]) EMOJIS[name] = value;
 }
 const FALLBACKS = {
+    youtube: '🎧',
+    youtube_music: '🎧',
     spotify: '🎧',
     soundcloud: '🎧',
     deezer: '🎧',
     apple_music: '🎧',
     tidal: '🎧',
+    monochrome: '🎧',
     headphones: '🎧',
     checkmark: '✅',
     xmark: '❌',

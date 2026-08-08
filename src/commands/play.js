@@ -11,6 +11,7 @@ const { searchWithRetry } = require('../utils/search');
 const { resolveSourceName } = require('../utils/capabilities');
 const { getEmoji } = require('../utils/emojis');
 const { getBotFooter } = require('../utils/branding');
+const { getUsableDefaultSearchSource } = require('../utils/guildSettings');
 //
 async function execute(message, args) {
     try {
@@ -25,21 +26,20 @@ async function execute(message, args) {
 
         const flags = args.filter(arg => arg.startsWith('--')).map(arg => arg.toLowerCase());
         const showResults = flags.includes('--sr') || flags.includes('--show-results');
+        const useYoutube = flags.includes('--yt') || flags.includes('--youtube');
+        const useYoutubeMusic = flags.includes('--ytm') || flags.includes('--youtube-music') || flags.includes('--youtubemusic');
+        const useSpotify = flags.includes('--sp') || flags.includes('--spotify');
         const useSoundcloud = flags.includes('--sc') || flags.includes('--soundcloud');
         const useDeezer = flags.includes('--dz') || flags.includes('--deezer');
         const useAppleMusic = flags.includes('--am') || flags.includes('--apple');
         const useTidal = flags.includes('--td') || flags.includes('--tidal');
 
-        const query = args.filter(arg => !arg.startsWith('--')).join(' ');
+        const selectedTrack = message.autocompleteTrack;
+        const selectedQuery = message.autocompleteQuery;
+        const query = selectedTrack ? selectedTrack.title : (selectedQuery || args.filter(arg => !arg.startsWith('--')).join(' '));
         if (!query) {
             return message.channel.send({
                 embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Missing Query`, 'Please provide a song name or URL!', '#FFA500')]
-            });
-        }
-
-        if (/youtube\.com|youtu\.be/i.test(query)) {
-            return message.channel.send({
-                embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Unsupported Platform`, 'YouTube playback is not supported.', '#FF0000')]
             });
         }
 
@@ -75,19 +75,32 @@ async function execute(message, args) {
 
             let source = null;
             if (!/^https?:\/\//i.test(query)) {
-                if (useSoundcloud) source = resolveSourceName('soundcloud');
+                if (useYoutube) source = resolveSourceName('youtube');
+                else if (useYoutubeMusic) source = resolveSourceName('youtubemusic');
+                else if (useSpotify) source = resolveSourceName('spotify');
+                else if (useSoundcloud) source = resolveSourceName('soundcloud');
                 else if (useDeezer) source = resolveSourceName('deezer');
                 else if (useAppleMusic) source = resolveSourceName('applemusic');
                 else if (useTidal) source = resolveSourceName('tidal');
+                else {
+                    const defaultSource = getUsableDefaultSearchSource(guild.id);
+                    if (defaultSource) source = resolveSourceName(defaultSource);
+                }
             }
 
-            const result = await searchWithRetry(player, query, message.author, source);
+            const result = selectedTrack
+                ? { loadType: 'search', tracks: [selectedTrack] }
+                : await searchWithRetry(player, query, message.author, source);
 
             if (result.loadType === 'empty' || result.loadType === 'error' || !result.tracks?.length) {
                 const reason = result.error?.message || result.error;
+                const youtubeRequested = ['youtube', 'ytsearch', 'youtubemusic', 'ytmsearch'].includes(source);
+                const description = youtubeRequested
+                    ? 'YouTube search failed on the connected Lavalink node. Enable a working YouTube source/plugin on that node, then try again.\n\n' + (reason || 'The node returned no tracks.')
+                    : reason || 'No tracks found for your query.';
                 await loadingMsg.edit({
                     content: '',
-                    embeds: [createEmbed(`${getEmoji('xmark', guild, channel)} Search Unavailable`, reason || 'No tracks found for your query.', '#FF0000')]
+                    embeds: [createEmbed(`${getEmoji(youtubeRequested ? 'warning' : 'xmark', guild, channel)} ${youtubeRequested ? 'YouTube Node Health Warning' : 'Search Unavailable'}`, description, '#FF0000')]
                 });
                 return;
             }

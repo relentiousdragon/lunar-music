@@ -47,6 +47,17 @@ function setQueueTimeout(guildId, delay) {
 }
 
 function registerPlayerEvents() {
+    const syncFilters = player => {
+        const { syncFilterState, updateNowPlayingEmbed } = require('../utils/filters');
+        syncFilterState(player)
+            .then(() => updateNowPlayingEmbed(player.guildId))
+            .catch(() => { });
+    };
+
+    manager.on('playerConnected', player => syncFilters(player));
+    manager.on('trackStart', player => syncFilters(player));
+    manager.on('filtersUpdate', player => syncFilters(player));
+
     manager.on('queueEnd', async (player) => {
         const guildId = player.guildId;
         const pState = playerStates.get(guildId);

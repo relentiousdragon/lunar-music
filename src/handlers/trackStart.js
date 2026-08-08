@@ -60,22 +60,20 @@ function registerTrackStart() {
         const trackLen = track.duration || 0;
         console.log(`[player] playing: ${track.title} | ${formatTime(trackLen)} | guild: ${guildId}`);
 
-        if (!state.nightcore && !state.vaporwave) {
-            if (acquireLyricsSlot(guildId)) {
-                fetchLyrics(track).then(async lyrics => {
-                    if (lyrics && playerStates.has(guildId)) {
-                        const s = playerStates.get(guildId);
-                        s.lyrics = lyrics;
-                        console.log(`[lyrics] found synced lyrics for "${track.title}"`);
-                        const { updateNowPlayingEmbed } = require('../utils/filters');
-                        await updateNowPlayingEmbed(guildId);
-                    } else {
-                        releaseLyricsSlot(guildId);
-                    }
-                }).catch(() => {
+        if (acquireLyricsSlot(guildId)) {
+            fetchLyrics(track).then(async lyrics => {
+                if (lyrics && playerStates.has(guildId)) {
+                    const s = playerStates.get(guildId);
+                    s.lyrics = lyrics;
+                    console.log(`[lyrics] found synced lyrics for "${track.title}"`);
+                    const { updateNowPlayingEmbed } = require('../utils/filters');
+                    await updateNowPlayingEmbed(guildId);
+                } else {
                     releaseLyricsSlot(guildId);
-                });
-            }
+                }
+            }).catch(() => {
+                releaseLyricsSlot(guildId);
+            });
         }
 
         const textChannel = client.channels.cache.get(player.textChannelId || player.textChannel);
