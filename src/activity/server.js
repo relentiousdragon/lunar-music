@@ -504,7 +504,9 @@ function createActivityServer() {
                     if (player._isNavigating) return;
                     player._isNavigating = true;
                     try {
-                        const pos = player.position || 0;
+                        const state = playerStates.get(session.guildId) || {};
+                        const now = Date.now();
+                        const pos = getMoonlinkPlaybackPosition(player, now) ?? getDirectNodePlaybackPosition(player, state, now) ?? state.manualPos ?? player.position ?? 0;
                         if (pos > 10000 || !player.previous || player.previous.length === 0) {
                             await player.seek(0);
                         } else {
