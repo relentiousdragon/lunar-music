@@ -605,7 +605,21 @@ function createActivityServer() {
         }
     }, 1000).unref();
 
-    const port = Number(process.env.ACTIVITY_PORT || 3001);
+    function resolveActivityPort() {
+        const actPortRaw = (process.env.ACTIVITY_PORT || '').trim();
+        if (!actPortRaw || actPortRaw.toLowerCase() === 'default') {
+            const srvPortRaw = (process.env.SERVER_PORT || '').trim();
+            const srvPortNum = Number(srvPortRaw);
+            if (srvPortRaw && !isNaN(srvPortNum) && srvPortNum > 0) {
+                return srvPortNum;
+            }
+            return 3001;
+        }
+        const actPortNum = Number(actPortRaw);
+        return (!isNaN(actPortNum) && actPortNum > 0) ? actPortNum : 3001;
+    }
+
+    const port = resolveActivityPort();
     const host = process.env.ACTIVITY_HOST || '0.0.0.0';
     server.listen(port, host, () => logger.info('activity_server_started', { host, port, secure: !allowInsecure }));
     return { server, broadcastGuild };
