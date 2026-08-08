@@ -5,7 +5,8 @@ function write(level, event, data = {}) {
         event,
         ...data
     };
-    if ((process.env.LOG_FORMAT || 'pretty').toLowerCase() === 'json') {
+    const format = (process.env.LOG_FORMAT || '').trim().toLowerCase();
+    if (format === 'json') {
         console.log(JSON.stringify(entry));
         return;
     }
