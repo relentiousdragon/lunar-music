@@ -25,13 +25,13 @@ async function execute(message, args) {
         }
 
         const flags = args.filter(arg => arg.startsWith('--')).map(arg => arg.toLowerCase());
-        const showResults = flags.includes('--sr') || flags.includes('--show-results');
+        const showResults = flags.includes('--sr') || flags.includes('--show-results') || flags.includes('--search-results');
         const useYoutube = flags.includes('--yt') || flags.includes('--youtube');
         const useYoutubeMusic = flags.includes('--ytm') || flags.includes('--youtube-music') || flags.includes('--youtubemusic');
         const useSpotify = flags.includes('--sp') || flags.includes('--spotify');
         const useSoundcloud = flags.includes('--sc') || flags.includes('--soundcloud');
         const useDeezer = flags.includes('--dz') || flags.includes('--deezer');
-        const useAppleMusic = flags.includes('--am') || flags.includes('--apple');
+        const useAppleMusic = flags.includes('--am') || flags.includes('--apple') || flags.includes('--apple-music') || flags.includes('--applemusic');
         const useTidal = flags.includes('--td') || flags.includes('--tidal');
 
         const selectedTrack = message.autocompleteTrack;
