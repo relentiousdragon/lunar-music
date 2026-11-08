@@ -338,8 +338,9 @@ function createActivityServer() {
                 const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' }[ext] || 'image/jpeg';
                 return res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=604800', 'X-Content-Type-Options': 'nosniff' }).end(fs.readFileSync(filePath));
             }
-            const root = requestUrl.pathname.startsWith('/activity/sdk/') ? SDK_ROOT : requestUrl.pathname.startsWith('/assets/') ? ASSETS_ROOT : ACTIVITY_ROOT;
-            const relative = requestUrl.pathname.startsWith('/activity/sdk/') ? requestUrl.pathname.slice('/activity/sdk/'.length) : requestUrl.pathname.startsWith('/assets/') ? requestUrl.pathname.slice('/assets/'.length) : (requestUrl.pathname === '/' || requestUrl.pathname === '/activity' ? 'index.html' : requestUrl.pathname.replace(/^\/activity\/?/, ''));
+            const sdkPrefix = requestUrl.pathname.startsWith('/sdk/') ? '/sdk/' : requestUrl.pathname.startsWith('/activity/sdk/') ? '/activity/sdk/' : null;
+            const root = sdkPrefix ? SDK_ROOT : requestUrl.pathname.startsWith('/assets/') ? ASSETS_ROOT : ACTIVITY_ROOT;
+            const relative = sdkPrefix ? requestUrl.pathname.slice(sdkPrefix.length) : requestUrl.pathname.startsWith('/assets/') ? requestUrl.pathname.slice('/assets/'.length) : (requestUrl.pathname === '/' || requestUrl.pathname === '/activity' ? 'index.html' : requestUrl.pathname.replace(/^\/activity\/?/, ''));
             const file = safeFile(root, relative || 'index.html');
             if (!file || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return res.writeHead(404).end('Not found');
             return res.writeHead(200, { 'Content-Type': contentType(file), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' }).end(fs.readFileSync(file));
