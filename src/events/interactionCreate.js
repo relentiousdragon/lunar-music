@@ -134,8 +134,19 @@ function defaultEntryPointDefinition() {
     };
 }
 
+let registrationInFlight = null;
+
 async function registerSlashCommands() {
     if (!process.env.DISCORD_TOKEN || !client.user) return;
+    if (!registrationInFlight) {
+        registrationInFlight = registerApplicationCommands().finally(() => {
+            registrationInFlight = null;
+        });
+    }
+    return registrationInFlight;
+}
+
+async function registerApplicationCommands() {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     const applicationId = client.user.id;
     const globalRoute = Routes.applicationCommands(applicationId);
