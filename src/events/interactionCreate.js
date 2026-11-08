@@ -8,6 +8,7 @@ const { getUsableDefaultSearchSource } = require('../utils/guildSettings');
 const { capabilities, resolveSourceName } = require('../utils/capabilities');
 const { getCachedSuggestions, cacheSuggestions, canSearchAutocomplete, createSelection, consumeSelection } = require('../utils/autocompleteCache');
 const { getGlobalTopTracks } = require('../utils/stats');
+const { getBotName } = require('../utils/branding');
 
 const SOURCE_CHOICES = [
     ['YouTube', 'youtube'], ['YouTube Music', 'youtubemusic'], ['SoundCloud', 'soundcloud'],
@@ -108,25 +109,60 @@ function toMessage(interaction) {
     };
 }
 
+const ENTRY_POINT_TYPE = 4;
+const LAUNCH_ACTIVITY_HANDLER = 2;
+
+function entryPointDefinition(entryPoint) {
+    return {
+        type: ENTRY_POINT_TYPE,
+        name: entryPoint.name,
+        description: entryPoint.description,
+        handler: entryPoint.handler ?? LAUNCH_ACTIVITY_HANDLER,
+        integration_types: entryPoint.integration_types || [0, 1],
+        contexts: entryPoint.contexts || [0, 1, 2]
+    };
+}
+
+function defaultEntryPointDefinition() {
+    return {
+        type: ENTRY_POINT_TYPE,
+        name: 'launch',
+        description: `Launch the ${getBotName()} music Activity`.slice(0, 100),
+        handler: LAUNCH_ACTIVITY_HANDLER,
+        integration_types: [0, 1],
+        contexts: [0, 1, 2]
+    };
+}
+
 async function registerSlashCommands() {
     if (!process.env.DISCORD_TOKEN || !client.user) return;
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-    const route = process.env.DISCORD_GUILD_ID
-        ? Routes.applicationGuildCommands(client.user.id, process.env.DISCORD_GUILD_ID)
-        : Routes.applicationCommands(client.user.id);
+    const applicationId = client.user.id;
+    const globalRoute = Routes.applicationCommands(applicationId);
+    const guildId = process.env.DISCORD_GUILD_ID;
     const definitions = createDefinitions();
-    const existing = await rest.get(route);
-    const entryPoint = Array.isArray(existing) ? existing.find(command => command.type === 4) : null;
-    const entryPointDefinition = entryPoint && {
-        type: entryPoint.type,
-        name: entryPoint.name,
-        description: entryPoint.description,
-        handler: entryPoint.handler,
-        integration_types: entryPoint.integration_types,
-        contexts: entryPoint.contexts
-    };
-    await rest.put(route, { body: entryPointDefinition ? [...definitions, entryPointDefinition] : definitions });
-    console.log(`[commands] registered ${definitions.length} slash commands`);
+
+    const globalCommands = await rest.get(globalRoute).catch(() => []);
+    const entryPoint = Array.isArray(globalCommands) ? globalCommands.find(command => command.type === ENTRY_POINT_TYPE) : null;
+    const existingEntryPoint = entryPoint && entryPointDefinition(entryPoint);
+
+    if (guildId) {
+        await rest.put(Routes.applicationGuildCommands(applicationId, guildId), { body: definitions });
+        console.log(`[commands] registered ${definitions.length} slash commands in guild ${guildId}`);
+    } else {
+        await rest.put(globalRoute, { body: existingEntryPoint ? [...definitions, existingEntryPoint] : definitions });
+        console.log(`[commands] registered ${definitions.length} global slash commands`);
+    }
+
+    if (existingEntryPoint) return;
+    if (process.env.ACTIVITY_ENABLED !== 'true') return;
+
+    try {
+        await rest.post(globalRoute, { body: defaultEntryPointDefinition() });
+        console.log('[commands] created the activity entry point command (launch)');
+    } catch (error) {
+        console.log(`[commands] could not create the activity entry point command: ${error.message} - enable Activities for this app in the Discord Developer Portal`);
+    }
 }
 
 function registerInteractionCreate() {
