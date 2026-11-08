@@ -554,10 +554,18 @@ function connectSocket(auth) {
   };
 }
 
+async function importSdk() {
+  try {
+    return await import('/sdk/index.mjs');
+  } catch (error) {
+    return import('/activity/sdk/index.mjs');
+  }
+}
+
 async function connectActivity() {
   try {
     setConnection('CONNECTING TO DISCORD…');
-    const { DiscordSDK } = await import('/activity/sdk/index.mjs');
+    const { DiscordSDK } = await importSdk();
     const config = await fetch('/config').then(response => response.json());
     state.config = config;
     if (config.botAvatar) $('brand-avatar').src = config.botAvatar;
