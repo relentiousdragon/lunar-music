@@ -554,19 +554,44 @@ function connectSocket(auth) {
   };
 }
 
+const SDK_SOURCES = ['/sdk/index.mjs?v=sdk-2.5.0', '/activity/sdk/index.mjs?v=sdk-2.5.0'];
+const SDK_ATTEMPTS = 3;
+
 async function importSdk() {
-  try {
-    return await import('/sdk/index.mjs');
-  } catch (error) {
-    return import('/activity/sdk/index.mjs');
+  let lastError = null;
+  for (let attempt = 1; attempt <= SDK_ATTEMPTS; attempt += 1) {
+    for (const source of SDK_SOURCES) {
+      try {
+        return await import(attempt === 1 ? source : `${source}&retry=${attempt}`);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (attempt < SDK_ATTEMPTS) await new Promise(resolve => setTimeout(resolve, 400 * attempt * attempt));
   }
+  throw new Error(`Discord SDK failed to load (${lastError?.message || 'network error'})`);
+}
+
+async function fetchJsonWithRetry(url, attempts = 3) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}attempt=${attempt}`);
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, 400 * attempt * attempt));
+    }
+  }
+  throw lastError;
 }
 
 async function connectActivity() {
   try {
     setConnection('CONNECTING TO DISCORD…');
     const { DiscordSDK } = await importSdk();
-    const config = await fetch('/config').then(response => response.json());
+    const config = await fetchJsonWithRetry('/config');
     state.config = config;
     if (config.botAvatar) $('brand-avatar').src = config.botAvatar;
     if (config.botName) {
@@ -590,6 +615,11 @@ async function connectActivity() {
     connectSocket({ code, guildId: sdk.guildId, channelId: sdk.channelId });
   } catch (error) {
     const msg = error.message || '';
+    if (/failed to load|failed to fetch|dynamically imported/i.test(msg)) {
+      console.error('[activity] Discord SDK unreachable', error);
+      setConnection('COULD NOT LOAD DISCORD SDK', 'error');
+      return;
+    }
     setConnection('DISCORD SETUP REQUIRED', 'error');
 
     if (/voice channel/i.test(msg) || /guild/i.test(msg) || /dm/i.test(msg)) {
