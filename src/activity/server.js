@@ -343,7 +343,8 @@ function createActivityServer() {
             const relative = sdkPrefix ? requestUrl.pathname.slice(sdkPrefix.length) : requestUrl.pathname.startsWith('/assets/') ? requestUrl.pathname.slice('/assets/'.length) : (requestUrl.pathname === '/' || requestUrl.pathname === '/activity' ? 'index.html' : requestUrl.pathname.replace(/^\/activity\/?/, ''));
             const file = safeFile(root, relative || 'index.html');
             if (!file || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return res.writeHead(404).end('Not found');
-            return res.writeHead(200, { 'Content-Type': contentType(file), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' }).end(fs.readFileSync(file));
+            const cacheControl = sdkPrefix ? 'public, max-age=86400' : 'no-store';
+            return res.writeHead(200, { 'Content-Type': contentType(file), 'Cache-Control': cacheControl, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' }).end(fs.readFileSync(file));
         } catch (error) {
             logger.warn('activity_http_error', { error: error.message });
             return res.writeHead(500).end('Server error');
